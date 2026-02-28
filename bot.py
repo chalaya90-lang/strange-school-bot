@@ -14,10 +14,13 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = Credentials.from_service_account_file(
-    "service_account.json",
+import os
+import json
+
+creds_info = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+creds = Credentials.from_service_account_info(
+    creds_info,
     scopes=SCOPES
-)
 
 gc = gspread.authorize(creds)
 sheet = gc.open("Відсутність учнів").sheet1
@@ -240,4 +243,5 @@ async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
+
     asyncio.run(main())
