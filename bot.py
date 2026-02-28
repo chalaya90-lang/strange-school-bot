@@ -16,7 +16,7 @@ SCOPES = [
 
 import os
 import json
-
+from google.oauth2.service_account import Credentials
 creds_info = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
 creds = Credentials.from_service_account_info(
     creds_info,
@@ -274,5 +274,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
