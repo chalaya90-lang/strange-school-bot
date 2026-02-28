@@ -237,11 +237,41 @@ async def handler(message: types.Message):
         await message.answer(f"📊 Відсутніх сьогодні: {count}")
         return
 
+
+# 🔔 ОСЬ ТУТ ВСТАВЛЯЄМО НАГАДУВАННЯ
+async def daily_schedule_reminder():
+    while True:
+        now = datetime.now()
+
+        # тільки будні
+        if now.weekday() < 5 and now.hour == 7 and now.minute == 50:
+
+            lessons_today = schedule.get(now.weekday(), [])
+
+            if lessons_today:
+                first_lesson = lessons_today[0]
+                message_text = (
+                    f"📚 Сьогодні {len(lessons_today)} уроків\n"
+                    f"Перший: {first_lesson}"
+                )
+
+                for user_id in users:
+                    try:
+                        await bot.send_message(user_id, message_text)
+                    except:
+                        pass
+
+            await asyncio.sleep(60)
+
+        await asyncio.sleep(20)
+
+
 async def main():
     load_students()
-    asyncio.create_task(reminder_loop())
+    asyncio.create_task(daily_schedule_reminder())  # ← ОСЬ ТУТ
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     asyncio.run(main())
+
