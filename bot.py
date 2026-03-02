@@ -223,11 +223,6 @@ async def handler(message: types.Message):
         reply_markup=main_kb
     )
     return
-        user_names[user_id] = text
-        save_student(user_id, text)
-        user_states[user_id] = "menu"
-        await message.answer(f"Збережено як: {text} ✅", reply_markup=main_kb)
-        return
 
 if text == "📅 Розклад":
     today = datetime.now().weekday()
@@ -364,6 +359,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
