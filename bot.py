@@ -189,20 +189,20 @@ async def handler(message: types.Message):
 
     state = user_states.get(user_id)
 
-if state == "waiting_name":
-
-    name = text.strip()
-
-    # Перевірка: мінімум 2 слова
-    parts = name.split()
-
-    if len(parts) < 2:
-        await message.answer(
-            "🫠 Ні-ні-ні.\n"
-            "Це не нік у TikTok.\n"
-            "Потрібне справжнє прізвище та ім’я."
-        )
-        return
+    if state == "waiting_name":
+    
+        name = text.strip()
+    
+        # Перевірка: мінімум 2 слова
+        parts = name.split()
+    
+        if len(parts) < 2:
+            await message.answer(
+                "🤭 Ні-ні-ні.\n"
+                "Це не нік у TikTok.\n"
+                "Потрібне справжнє прізвище та ім’я."
+            )
+            return
 
     # Перевірка: тільки літери
     if not all(part.replace("'", "").isalpha() for part in parts):
@@ -364,6 +364,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
