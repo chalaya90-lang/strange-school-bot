@@ -192,6 +192,39 @@ async def handler(message: types.Message):
     state = user_states.get(user_id)
 
     if state == "waiting_name":
+
+    name = text.strip()
+
+    # Перевірка: мінімум 2 слова
+    parts = name.split()
+
+    if len(parts) < 2:
+        await message.answer(
+            "🚨 Система виявила підозрілий запис.\n"
+            "Прізвище й ім'я мають бути разом 😏\n\n"
+            "Журнал вже дивиться на тебе..."
+        )
+        return
+
+    # Перевірка: тільки літери
+    if not all(part.replace("'", "").isalpha() for part in parts):
+        await message.answer(
+            "😑 Це що, пароль від Wi-Fi?\n"
+            "Введи нормальне прізвище та ім’я без цифр і символів."
+        )
+        return
+
+    # Якщо все ок
+    user_names[user_id] = name
+    save_student(user_id, name)
+    user_states[user_id] = "menu"
+
+    await message.answer(
+        f"Збережено як: {name} ✅\n"
+        "Тепер система знає, хто ти 😉",
+        reply_markup=main_kb
+    )
+    return
         user_names[user_id] = text
         save_student(user_id, text)
         user_states[user_id] = "menu"
@@ -202,26 +235,30 @@ if text == "📅 Розклад":
     today = datetime.now().weekday()
 
     if today in schedule:
-        lessons = ""
+        lessons_text = ""
 
         for lesson_number, lesson in schedule[today]:
             if lesson_number - 1 < len(lesson_times):
                 start, end = lesson_times[lesson_number - 1]
-                lessons += f"{lesson_number}. {lesson} ({start}-{end})\n"
+                lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
 
-        await message.answer(f"📚 Сьогодні:\n\n{lessons}")
+        await message.answer(f"📚 Сьогодні:\n\n{lessons_text}")
     else:
         await message.answer("Сьогодні уроків немає 😎")
 
     return
 
 if text == "⏰ Який урок зараз?":
-    now = datetime.now().time()
-    today = datetime.now().weekday()
+    num, lesson, start, end = get_current_lesson()
 
-    if today not in schedule:
-        await message.answer("Сьогодні уроків немає 😌")
-        return
+    if lesson:
+        await message.answer(
+            f"Зараз {num} урок 📖\n{lesson}\n{start}-{end}"
+        )
+    else:
+        await message.answer("Зараз перерва або уроків немає 😌")
+
+    return
 
     for lesson_number, lesson in schedule[today]:
 
@@ -329,6 +366,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
