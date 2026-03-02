@@ -103,13 +103,16 @@ def get_current_lesson():
     if today not in schedule:
         return None, None
 
-    for i, (start, end) in enumerate(lesson_times):
-        start_t = datetime.strptime(start, "%H:%M").time()
-        end_t = datetime.strptime(end, "%H:%M").time()
+    for lesson_number, lesson in schedule[today]:
 
-        if start_t <= now <= end_t:
-            if i < len(schedule[today]):
-                return i, schedule[today][i]
+        if lesson_number - 1 < len(lesson_times):
+            start, end = lesson_times[lesson_number - 1]
+
+            start_t = datetime.strptime(start, "%H:%M").time()
+            end_t = datetime.strptime(end, "%H:%M").time()
+
+            if start_t <= now <= end_t:
+                return lesson_number, lesson
 
     return None, None
 
@@ -165,25 +168,47 @@ async def handler(message: types.Message):
         await message.answer(f"Збережено як: {text} ✅", reply_markup=main_kb)
         return
 
-    if text == "📅 Розклад":
-        today = datetime.now().weekday()
-        if today in schedule:
-            lessons = ""
-            for i, lesson in enumerate(schedule[today]):
-                start, end = lesson_times[i]
-                lessons += f"{i+1}. {lesson} ({start}-{end})\n"
-            await message.answer(f"📚 Сьогодні:\n\n{lessons}")
-        else:
-            await message.answer("Сьогодні уроків немає 😎")
+if text == "📅 Розклад":
+    today = datetime.now().weekday()
+
+    if today in schedule:
+        lessons = ""
+
+        for lesson_number, lesson in schedule[today]:
+            if lesson_number - 1 < len(lesson_times):
+                start, end = lesson_times[lesson_number - 1]
+                lessons += f"{lesson_number}. {lesson} ({start}-{end})\n"
+
+        await message.answer(f"📚 Сьогодні:\n\n{lessons}")
+    else:
+        await message.answer("Сьогодні уроків немає 😎")
+
+    return
+
+if text == "⏰ Який урок зараз?":
+    now = datetime.now().time()
+    today = datetime.now().weekday()
+
+    if today not in schedule:
+        await message.answer("Сьогодні уроків немає 😌")
         return
 
-    if text == "⏰ Який урок зараз?":
-        num, lesson = get_current_lesson()
-        if lesson:
-            await message.answer(f"Зараз {lesson} 📖")
-        else:
-            await message.answer("Зараз перерва або уроків немає 😌")
-        return
+    for lesson_number, lesson in schedule[today]:
+
+        if lesson_number - 1 < len(lesson_times):
+            start, end = lesson_times[lesson_number - 1]
+
+            start_t = datetime.strptime(start, "%H:%M").time()
+            end_t = datetime.strptime(end, "%H:%M").time()
+
+            if start_t <= now <= end_t:
+                await message.answer(
+                    f"Зараз {lesson_number} урок 📖\n{lesson}\n{start}-{end}"
+                )
+                return
+
+    await message.answer("Зараз перерва або уроків немає 😌")
+    return
 
     if text == "🔔 Дзвінки":
         times = "\n".join([f"{i+1}. {s}-{e}" for i, (s, e) in enumerate(lesson_times)])
@@ -274,6 +299,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
