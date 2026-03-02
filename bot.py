@@ -354,11 +354,30 @@ if text == "📅 Розклад":
 
         await message.answer(f"📊 Відсутніх сьогодні: {count}")
         return
-        if text == "🏆 Рейтинг активності":
+       if text == "🏆 Рейтинг активності":
 
     if not usage_stats:
         await message.answer("Поки що всі сонні 😴")
         return
+
+    ranking = []
+
+    for uid, stats in usage_stats.items():
+        total = stats["schedule"] + stats["current"]
+        name = user_names.get(uid, "Невідомий")
+        ranking.append((name, total))
+
+    ranking.sort(key=lambda x: x[1], reverse=True)
+
+    text_result = "🏆 Рейтинг активності:\n\n"
+
+    for i, (name, total) in enumerate(ranking[:5], start=1):
+        text_result += f"{i}. {name} — {total} звернень\n"
+
+    text_result += "\nДиректор все бачить 👀"
+
+    await message.answer(text_result)
+    return
 
     ranking = []
 
@@ -416,6 +435,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
