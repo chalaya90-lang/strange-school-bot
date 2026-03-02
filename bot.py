@@ -83,7 +83,6 @@ schedule = {
         (4,"Математика"),
         (5,"Вчимося жити разом")]
 }
-}
 
 # ---------------- КЛАВІАТУРИ ----------------
 main_kb = ReplyKeyboardMarkup(
@@ -364,6 +363,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
