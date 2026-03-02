@@ -49,7 +49,6 @@ lesson_times = [
 ]
 
 schedule = {
-schedule = {
     0: [(1,"Англійська"),
         (2,"Англійська"),
         (3,"Фізкультура"),
@@ -367,6 +366,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
