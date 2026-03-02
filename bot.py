@@ -32,6 +32,15 @@ dp = Dispatcher()
 user_states = {}
 user_names = {}
 users = set()
+usage_stats = {}
+def update_usage(user_id, action):
+    if user_id not in usage_stats:
+        usage_stats[user_id] = {
+            "schedule": 0,
+            "current": 0
+        }
+
+    usage_stats[user_id][action] += 1
 
 # ---------------- РОЗКЛАД ----------------
 lesson_times = [
@@ -93,6 +102,7 @@ main_kb = ReplyKeyboardMarkup(
         [KeyboardButton(text="📩 Повідомити про відсутність")],
         [KeyboardButton(text="📢 Оголошення")],
         [KeyboardButton(text="📊 Статистика")]
+        [KeyboardButton(text="🏆 Рейтинг активності")],
     ],
     resize_keyboard=True
 )
@@ -231,6 +241,7 @@ if text == "📅 Розклад":
         lessons = schedule[today]
 
         if not lessons:
+            update_usage(user_id, "schedule")
             await message.answer("Сьогодні уроків немає 😎")
             return
 
@@ -264,6 +275,7 @@ if text == "⏰ Який урок зараз?":
 
     if lesson:
         await message.answer(
+            update_usage(user_id, "current")
             f"Зараз {num} урок 📖\n{lesson}\n{start}-{end}"
         )
     else:
@@ -339,6 +351,30 @@ if text == "⏰ Який урок зараз?":
 
         await message.answer(f"📊 Відсутніх сьогодні: {count}")
         return
+        if text == "🏆 Рейтинг активності":
+
+    if not usage_stats:
+        await message.answer("Поки що всі сонні 😴")
+        return
+
+    ranking = []
+
+    for uid, stats in usage_stats.items():
+        total = stats["schedule"] + stats["current"]
+        name = user_names.get(uid, "Невідомий")
+        ranking.append((name, total))
+
+    ranking.sort(key=lambda x: x[1], reverse=True)
+
+    text_result = "🏆 Рейтинг активності:\n\n"
+
+    for i, (name, total) in enumerate(ranking[:5], start=1):
+        text_result += f"{i}. {name} — {total} звернень\n"
+
+    text_result += "\nДиректор все бачить 👀"
+
+    await message.answer(text_result)
+    return
 
 
 # 🔔 ОСЬ ТУТ ВСТАВЛЯЄМО НАГАДУВАННЯ
@@ -377,6 +413,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
