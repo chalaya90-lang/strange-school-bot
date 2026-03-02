@@ -270,18 +270,21 @@ if text == "📅 Розклад":
 
     return
 
-if text == "⏰ Який урок зараз?":
-    num, lesson, start, end = get_current_lesson()
-
-    if lesson:
-        await message.answer(
-            update_usage(user_id, "current")
-            f"Зараз {num} урок 📖\n{lesson}\n{start}-{end}"
-        )
-    else:
-        await message.answer("Зараз перерва або уроків немає 😌")
-
-    return
+    if text == "⏰ Який урок зараз?":
+        num, lesson, start, end = get_current_lesson()
+    
+        update_usage(user_id, "current")  # ← ОТУТ
+    
+        if lesson:
+            await message.answer(
+                f"Зараз {num} урок 📖\n"
+                f"{lesson}\n"
+                f"{start}-{end}"
+            )
+        else:
+            await message.answer("Зараз перерва або уроків немає 😌")
+    
+        return
 
     for lesson_number, lesson in schedule[today]:
 
@@ -413,6 +416,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
