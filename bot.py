@@ -189,7 +189,7 @@ async def handler(message: types.Message):
 
     state = user_states.get(user_id)
 
-    if state == "waiting_name":
+if state == "waiting_name":
 
     name = text.strip()
 
@@ -198,8 +198,9 @@ async def handler(message: types.Message):
 
     if len(parts) < 2:
         await message.answer(
-            "🚨 Система виявила підозрілий запис.\n"
-            "🫠 Ні-ні-ні.Це не нік у TikTok.Потрібне справжнє прізвище та ім’я."
+            "🫠 Ні-ні-ні.\n"
+            "Це не нік у TikTok.\n"
+            "Потрібне справжнє прізвище та ім’я."
         )
         return
 
@@ -363,6 +364,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
