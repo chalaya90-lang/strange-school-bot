@@ -201,8 +201,9 @@ async def handler(message: types.Message):
     if len(parts) < 2:
         await message.answer(
             "🚨 Система виявила підозрілий запис.\n"
-            "Прізвище й ім'я мають бути разом 😏\n\n"
-            "Журнал вже дивиться на тебе..."
+            "🫠 Ні-ні-ні.
+Це не нік у TikTok.
+Потрібне справжнє прізвище та ім’я."
         )
         return
 
@@ -366,6 +367,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
