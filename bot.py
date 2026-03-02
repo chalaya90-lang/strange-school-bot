@@ -235,7 +235,7 @@ if text == "📅 Розклад":
                 start, end = lesson_times[lesson_number - 1]
                 lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
 
-        await message.answer(f"📚 Сьогодні:\n\n{lessons_text}")
+            await message.answer(f"📚 Сьогодні:\n\n{lessons_text}")
 
     else:
         await message.answer("Сьогодні уроків немає 😎")
@@ -360,6 +360,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
