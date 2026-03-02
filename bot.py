@@ -228,15 +228,32 @@ if text == "📅 Розклад":
     today = datetime.now().weekday()
 
     if today in schedule:
+        lessons = schedule[today]
+
+        if not lessons:
+            await message.answer("Сьогодні уроків немає 😎")
+            return
+
         lessons_text = ""
 
-        for lesson_number, lesson in schedule[today]:
+        for lesson_number, lesson in lessons:
             if lesson_number - 1 < len(lesson_times):
                 start, end = lesson_times[lesson_number - 1]
                 lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
 
-            await message.answer(f"📚 Сьогодні:\n\n{lessons_text}")
+        # Перший і останній урок
+        first_num, _ = lessons[0]
+        last_num, _ = lessons[-1]
 
+        first_start = lesson_times[first_num - 1][0]
+        last_end = lesson_times[last_num - 1][1]
+
+        await message.answer(
+            f"📚 Сьогодні {len(lessons)} уроків\n"
+            f"Початок о {first_start}\n"
+            f"Закінчення о {last_end}\n\n"
+            f"{lessons_text}"
+        )
     else:
         await message.answer("Сьогодні уроків немає 😎")
 
@@ -360,6 +377,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
