@@ -335,29 +335,29 @@ if text == "📅 Розклад":
         await message.answer("Оголошення розіслано ✅", reply_markup=main_kb)
         return
 
-    if text == "📊 Статистика":
-        if user_id not in ADMIN_IDS:
-            await message.answer("Доступ тільки для адміністрації 🔒")
+    if text == "🏆 Рейтинг активності":
+
+        if not usage_stats:
+            await message.answer("Поки що всі сонні 😴")
             return
 
-        today = datetime.now().strftime("%d.%m.%Y")
-        count = 0
+        ranking = []
 
-        try:
-            with open("absences.txt", "r", encoding="utf-8") as f:
-                for line in f:
-                    if today in line:
-                        count += 1
-        except FileNotFoundError:
-            await message.answer("Записів ще немає")
-            return
+        for uid, stats in usage_stats.items():
+            total = stats["schedule"] + stats["current"]
+            name = user_names.get(uid, "Невідомий")
+            ranking.append((name, total))
 
-        await message.answer(f"📊 Відсутніх сьогодні: {count}")
-        return
-       if text == "🏆 Рейтинг активності":
+        ranking.sort(key=lambda x: x[1], reverse=True)
 
-    if not usage_stats:
-        await message.answer("Поки що всі сонні 😴")
+        text_result = "🏆 Рейтинг активності:\n\n"
+
+        for i, (name, total) in enumerate(ranking[:5], start=1):
+            text_result += f"{i}. {name} — {total} звернень\n"
+
+        text_result += "\nДиректор усе бачить 👀"
+
+        await message.answer(text_result)
         return
 
     ranking = []
@@ -435,6 +435,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
