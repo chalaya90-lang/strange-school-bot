@@ -1,12 +1,17 @@
 import asyncio
+import os
+import json
+from datetime import datetime, timedelta
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from datetime import datetime, timedelta
+
 import gspread
 from google.oauth2.service_account import Credentials
 
+
 TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
-ADMIN_IDS = {123456789, 5687913918}  # ID вчителя і старости
+ADMIN_IDS = {123456789, 5687913918}
 
 # ---------------- GOOGLE SHEETS ----------------
 SCOPES = [
@@ -14,14 +19,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-import os
-import json
-from google.oauth2.service_account import Credentials
 creds_info = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-creds = Credentials.from_service_account_info(
-    creds_info,
-    scopes=SCOPES
-)
+creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 gc = gspread.authorize(creds)
 sheet = gc.open("Відсутність учнів").sheet1
 # ------------------------------------------------
@@ -33,14 +32,13 @@ user_states = {}
 user_names = {}
 users = set()
 usage_stats = {}
+
+# ---------------- СТАТИСТИКА ----------------
 def update_usage(user_id, action):
     if user_id not in usage_stats:
-        usage_stats[user_id] = {
-            "schedule": 0,
-            "current": 0
-        }
-
+        usage_stats[user_id] = {"schedule": 0, "current": 0}
     usage_stats[user_id][action] += 1
+
 
 # ---------------- РОЗКЛАД ----------------
 lesson_times = [
@@ -58,38 +56,25 @@ lesson_times = [
 ]
 
 schedule = {
-    0: [(1,"Англійська"),
-        (2,"Англійська"),
-        (3,"Фізкультура"),
-        (4,"Інтегрований курс"),
-        (5,"Математика"),
-        (6,"Математика")],
+    0: [(1,"Англійська"), (2,"Англійська"), (3,"Фізкультура"),
+        (4,"Інтегрований курс"), (5,"Математика"), (6,"Математика")],
 
-    1: [(1,"Музичне мистецтво"),
-        (2,"Українська мова"),
-        (3,"Українська мова"),
-        (4,"Географія"),
-        (5,"Географія"),
-        (6,"Польська мова")],
+    1: [(1,"Музичне мистецтво"), (2,"Українська мова"),
+        (3,"Українська мова"), (4,"Географія"),
+        (5,"Географія"), (6,"Польська мова")],
 
-    2: [(1,"Технології"),
-        (2,"Технології"),
-        (3,"Фізкультура"),
-        (4,"Інформатика"),
+    2: [(1,"Технології"), (2,"Технології"),
+        (3,"Фізкультура"), (4,"Інформатика"),
         (5,"Українська література"),
         (6,"Українська література"),
         (7,"Англійська")],
 
-    3: [(1,"Історія України"),
-        (2,"Історія України"),
-        (3,"Математика"),
-        (4,"Математика"),
+    3: [(1,"Історія України"), (2,"Історія України"),
+        (3,"Математика"), (4,"Математика"),
         (5,"Пізнаємо природу")],
 
-    4: [(1,"Українська мова"),
-        (2,"Українська мова"),
-        (3,"Фізкультура"),
-        (4,"Математика"),
+    4: [(1,"Українська мова"), (2,"Українська мова"),
+        (3,"Фізкультура"), (4,"Математика"),
         (5,"Вчимося жити разом")]
 }
 
@@ -101,8 +86,8 @@ main_kb = ReplyKeyboardMarkup(
         [KeyboardButton(text="🔔 Дзвінки")],
         [KeyboardButton(text="📩 Повідомити про відсутність")],
         [KeyboardButton(text="📢 Оголошення")],
-        [KeyboardButton(text="📊 Статистика")]
-        [KeyboardButton(text="🏆 Рейтинг активності")],
+        [KeyboardButton(text="📊 Статистика")],
+        [KeyboardButton(text="🏆 Рейтинг активності")]
     ],
     resize_keyboard=True
 )
@@ -112,19 +97,21 @@ back_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# ---------------- ДОПОМІЖНІ ----------------
+# ---------------- ФАЙЛИ ----------------
 def load_students():
     try:
         with open("students.txt", "r", encoding="utf-8") as f:
             for line in f:
-                user_id, name = line.strip().split("|")
-                user_names[int(user_id)] = name
+                uid, name = line.strip().split("|")
+                user_names[int(uid)] = name
     except FileNotFoundError:
         pass
+
 
 def save_student(user_id, name):
     with open("students.txt", "a", encoding="utf-8") as f:
         f.write(f"{user_id}|{name}\n")
+
 
 def save_absence(name, reason):
     now = datetime.now().strftime("%d.%m.%Y %H:%M")
@@ -134,46 +121,6 @@ def save_absence(name, reason):
 
     sheet.append_row([now, name, reason])
 
-def get_current_lesson():
-    now = datetime.now().time()
-    today = datetime.now().weekday()
-
-    if today not in schedule:
-        return None, None
-
-    for lesson_number, lesson in schedule[today]:
-
-        if lesson_number - 1 < len(lesson_times):
-            start, end = lesson_times[lesson_number - 1]
-
-            start_t = datetime.strptime(start, "%H:%M").time()
-            end_t = datetime.strptime(end, "%H:%M").time()
-
-            if start_t <= now <= end_t:
-                return lesson_number, lesson
-
-    return None, None
-
-# ---------------- НАГАДУВАННЯ ----------------
-async def reminder_loop():
-    while True:
-        now = datetime.now()
-
-        for i, (start, _) in enumerate(lesson_times):
-            lesson_time = datetime.strptime(start, "%H:%M")
-            notify_time = lesson_time - timedelta(minutes=5)
-
-            if now.hour == notify_time.hour and now.minute == notify_time.minute:
-                today = now.weekday()
-                if today in schedule and i < len(schedule[today]):
-                    lesson = schedule[today][i]
-                    for user_id in users:
-                        await bot.send_message(
-                            user_id,
-                            f"⏳ Через 5 хв починається {i+1} урок — {lesson}"
-                        )
-
-        await asyncio.sleep(30)
 
 # ---------------- HANDLER ----------------
 @dp.message()
@@ -182,108 +129,59 @@ async def handler(message: types.Message):
     user_id = message.chat.id
     users.add(user_id)
 
+    state = user_states.get(user_id)
+
+    # ---- START ----
     if text == "/start":
         if user_id not in user_names:
             user_states[user_id] = "waiting_name"
-            await message.answer("Введіть своє прізвище та ім’я ✍️")
+            await message.answer("Введіть прізвище та ім’я ✍️")
             return
 
-        user_states[user_id] = "menu"
         await message.answer("Головне меню 📚", reply_markup=main_kb)
         return
 
-    if text == "⬅ Назад":
-        user_states[user_id] = "menu"
-        await message.answer("Головне меню 📚", reply_markup=main_kb)
-        return
-
-    state = user_states.get(user_id)
-
+    # ---- ІМ'Я ----
     if state == "waiting_name":
-    
+
         name = text.strip()
-    
-        # Перевірка: мінімум 2 слова
         parts = name.split()
-    
+
         if len(parts) < 2:
-            await message.answer(
-                "🤭 Ні-ні-ні.\n"
-                "Це не нік у TikTok.\n"
-                "Потрібне справжнє прізвище та ім’я."
-            )
+            await message.answer("🤭 Це не нік у TikTok.\nПотрібне прізвище та ім’я.")
             return
 
-    # Перевірка: тільки літери
-    if not all(part.replace("'", "").isalpha() for part in parts):
-        await message.answer(
-            "😑 Це що, пароль від Wi-Fi?\n"
-            "Введи нормальне прізвище та ім’я без цифр і символів."
-        )
+        if not all(part.replace("'", "").isalpha() for part in parts):
+            await message.answer("😑 Без цифр і символів.")
+            return
+
+        user_names[user_id] = name
+        save_student(user_id, name)
+        user_states[user_id] = "menu"
+
+        await message.answer(f"Збережено як: {name} ✅", reply_markup=main_kb)
         return
 
-    # Якщо все ок
-    user_names[user_id] = name
-    save_student(user_id, name)
-    user_states[user_id] = "menu"
-
-    await message.answer(
-        f"Збережено як: {name} ✅\n"
-        "Тепер система знає, хто ти 😉",
-        reply_markup=main_kb
-    )
-    return
-
+    # ---- РОЗКЛАД ----
     if text == "📅 Розклад":
 
         update_usage(user_id, "schedule")
 
         today = datetime.now().weekday()
 
-        if today in schedule:
-            lessons = schedule[today]
-
-            if not lessons:
-                await message.answer("Сьогодні уроків немає 😎")
-                return
-
-            lessons_text = ""
-
-            for lesson_number, lesson in lessons:
-                if lesson_number - 1 < len(lesson_times):
-                    start, end = lesson_times[lesson_number - 1]
-                    lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
-
-            first_num, _ = lessons[0]
-            last_num, _ = lessons[-1]
-
-            first_start = lesson_times[first_num - 1][0]
-            last_end = lesson_times[last_num - 1][1]
-
-            await message.answer(
-                f"📚 Сьогодні {len(lessons)} уроків\n"
-                f"Початок о {first_start}\n"
-                f"Закінчення о {last_end}\n\n"
-                f"{lessons_text}"
-            )
-        else:
+        if today not in schedule:
             await message.answer("Сьогодні уроків немає 😎")
+            return
 
-        return
-
+        lessons = schedule[today]
         lessons_text = ""
 
         for lesson_number, lesson in lessons:
-            if lesson_number - 1 < len(lesson_times):
-                start, end = lesson_times[lesson_number - 1]
-                lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
+            start, end = lesson_times[lesson_number - 1]
+            lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
 
-        # Перший і останній урок
-        first_num, _ = lessons[0]
-        last_num, _ = lessons[-1]
-
-        first_start = lesson_times[first_num - 1][0]
-        last_end = lesson_times[last_num - 1][1]
+        first_start = lesson_times[lessons[0][0] - 1][0]
+        last_end = lesson_times[lessons[-1][0] - 1][1]
 
         await message.answer(
             f"📚 Сьогодні {len(lessons)} уроків\n"
@@ -291,76 +189,37 @@ async def handler(message: types.Message):
             f"Закінчення о {last_end}\n\n"
             f"{lessons_text}"
         )
-    else:
-        await message.answer("Сьогодні уроків немає 😎")
-
-    return
-
-    if text == "⏰ Який урок зараз?":
-        num, lesson, start, end = get_current_lesson()
-    
-        update_usage(user_id, "current")  # ← ОТУТ
-    
-        if lesson:
-            await message.answer(
-                f"Зараз {num} урок 📖\n"
-                f"{lesson}\n"
-                f"{start}-{end}"
-            )
-        else:
-            await message.answer("Зараз перерва або уроків немає 😌")
-    
         return
 
-    for lesson_number, lesson in schedule[today]:
+    # ---- ЯКИЙ УРОК ----
+    if text == "⏰ Який урок зараз?":
 
-        if lesson_number - 1 < len(lesson_times):
+        update_usage(user_id, "current")
+
+        now = datetime.now().time()
+        today = datetime.now().weekday()
+
+        if today not in schedule:
+            await message.answer("Уроків немає 😌")
+            return
+
+        for lesson_number, lesson in schedule[today]:
             start, end = lesson_times[lesson_number - 1]
-
             start_t = datetime.strptime(start, "%H:%M").time()
             end_t = datetime.strptime(end, "%H:%M").time()
 
             if start_t <= now <= end_t:
                 await message.answer(
-                    f"Зараз {lesson_number} урок 📖\n{lesson}\n{start}-{end}"
+                    f"Зараз {lesson_number} урок 📖\n"
+                    f"{lesson}\n"
+                    f"{start}-{end}"
                 )
                 return
 
-    await message.answer("Зараз перерва або уроків немає 😌")
-    return
-
-    if text == "🔔 Дзвінки":
-        times = "\n".join([f"{i+1}. {s}-{e}" for i, (s, e) in enumerate(lesson_times)])
-        await message.answer(f"🔔 Скорочені дзвінки:\n\n{times}")
+        await message.answer("Перерва 😎")
         return
 
-    if text == "📩 Повідомити про відсутність":
-        user_states[user_id] = "waiting_absence"
-        await message.answer("Напишіть причину ✍️", reply_markup=back_kb)
-        return
-
-    if state == "waiting_absence":
-        name = user_names.get(user_id, "Невідомий")
-        save_absence(name, text)
-        user_states[user_id] = "menu"
-        await message.answer("Запис додано в журнал ✅", reply_markup=main_kb)
-        return
-
-    if text == "📢 Оголошення":
-        if user_id not in ADMIN_IDS:
-            await message.answer("Доступ тільки для адміністрації 🔒")
-            return
-        user_states[user_id] = "waiting_announcement"
-        await message.answer("Введіть текст оголошення 📝", reply_markup=back_kb)
-        return
-
-    if state == "waiting_announcement":
-        for u in users:
-            await bot.send_message(u, f"📢 ОГОЛОШЕННЯ:\n\n{text}")
-        user_states[user_id] = "menu"
-        await message.answer("Оголошення розіслано ✅", reply_markup=main_kb)
-        return
-
+    # ---- РЕЙТИНГ ----
     if text == "🏆 Рейтинг активності":
 
         if not usage_stats:
@@ -379,108 +238,19 @@ async def handler(message: types.Message):
         text_result = "🏆 Рейтинг активності:\n\n"
 
         for i, (name, total) in enumerate(ranking[:5], start=1):
-            text_result += f"{i}. {name} — {total} звернень\n"
+            text_result += f"{i}. {name} — {total}\n"
 
         text_result += "\nДиректор усе бачить 👀"
 
         await message.answer(text_result)
         return
 
-    ranking = []
 
-    for uid, stats in usage_stats.items():
-        total = stats["schedule"] + stats["current"]
-        name = user_names.get(uid, "Невідомий")
-        ranking.append((name, total))
-
-    ranking.sort(key=lambda x: x[1], reverse=True)
-
-    text_result = "🏆 Рейтинг активності:\n\n"
-
-    for i, (name, total) in enumerate(ranking[:5], start=1):
-        text_result += f"{i}. {name} — {total} звернень\n"
-
-    text_result += "\nДиректор все бачить 👀"
-
-    await message.answer(text_result)
-    return
-
-    ranking = []
-
-    for uid, stats in usage_stats.items():
-        total = stats["schedule"] + stats["current"]
-        name = user_names.get(uid, "Невідомий")
-        ranking.append((name, total))
-
-    ranking.sort(key=lambda x: x[1], reverse=True)
-
-    text_result = "🏆 Рейтинг активності:\n\n"
-
-    for i, (name, total) in enumerate(ranking[:5], start=1):
-        text_result += f"{i}. {name} — {total} звернень\n"
-
-    text_result += "\nДиректор все бачить 👀"
-
-    await message.answer(text_result)
-    return
-
-
-# 🔔 ОСЬ ТУТ ВСТАВЛЯЄМО НАГАДУВАННЯ
-async def daily_schedule_reminder():
-    while True:
-        now = datetime.now()
-
-        # тільки будні
-        if now.weekday() < 5 and now.hour == 7 and now.minute == 50:
-
-            lessons_today = schedule.get(now.weekday(), [])
-
-            if lessons_today:
-                first_lesson = lessons_today[0]
-                message_text = (
-                    f"📚 Сьогодні {len(lessons_today)} уроків\n"
-                    f"Перший: {first_lesson}"
-                )
-
-                for user_id in users:
-                    try:
-                        await bot.send_message(user_id, message_text)
-                    except:
-                        pass
-
-            await asyncio.sleep(60)
-
-        await asyncio.sleep(20)
-
-
+# ---------------- ЗАПУСК ----------------
 async def main():
     load_students()
-    asyncio.create_task(daily_schedule_reminder())  # ← ОСЬ ТУТ
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
