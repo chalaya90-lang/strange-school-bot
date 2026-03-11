@@ -301,22 +301,22 @@ async def handler(message: types.Message):
     
         rows = schedule_sheet.get_all_records()
     
-        bells = []
+        bells = set()
     
         for row in rows:
     
             start = row["Початок"]
             end = row["Кінець"]
     
-            pair = f"{start}-{end}"
+            bells.add((start, end))
     
-            if pair not in bells:
-                bells.append(pair)
+        # сортуємо по часу початку
+        bells = sorted(bells, key=lambda x: x[0])
     
         result = "🔔 Дзвінки:\n\n"
     
-        for i, bell in enumerate(bells, start=1):
-            result += f"{i}. {bell}\n"
+        for i, (start, end) in enumerate(bells, start=1):
+            result += f"{i}. {start}-{end}\n"
     
         await message.answer(result)
     
@@ -420,4 +420,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
