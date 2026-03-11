@@ -154,29 +154,38 @@ def save_absence(name, reason):
 
 def get_current_lesson():
 
-    schedule = load_schedule()
-
-    today = datetime.now().weekday()
     now = datetime.now().time()
+
+    # визначаємо номер уроку по часу
+    current_lesson_number = None
+
+    for num, (start, end) in lesson_times.items():
+
+        start_t = datetime.strptime(start, "%H:%M").time()
+        end_t = datetime.strptime(end, "%H:%M").time()
+
+        if start_t <= now <= end_t:
+            current_lesson_number = num
+            break
+
+    if current_lesson_number is None:
+        return None
+
+    schedule = load_schedule()
+    today = datetime.now().weekday()
 
     if today not in schedule:
         return None
 
     for lesson_number, subject in schedule[today]:
 
-        if lesson_number not in lesson_times:
-            continue
+        if lesson_number == current_lesson_number:
 
-        start, end = lesson_times[lesson_number]
+            start, end = lesson_times[lesson_number]
 
-        start_t = datetime.strptime(start, "%H:%M").time()
-        end_t = datetime.strptime(end, "%H:%M").time()
-
-        # якщо зараз урок
-        if start_t <= now <= end_t:
             return lesson_number, subject, start, end
 
-    return NoneNone
+    return None
 
 
 # ---------- HANDLER ----------
@@ -416,4 +425,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
