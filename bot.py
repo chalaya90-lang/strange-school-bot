@@ -114,7 +114,9 @@ def get_current_lesson():
     rows = schedule_sheet.get_all_records()
 
     now = datetime.now(kyiv).time()
-    today = (datetime.utcnow().hour + 3 >= 0) and datetime.utcnow().weekday()
+    today = datetime.now(kyiv).weekday()
+
+    lessons = []
 
     for row in rows:
 
@@ -125,6 +127,13 @@ def get_current_lesson():
 
         if day != today:
             continue
+
+        lessons.append(row)
+
+    # сортуємо по часу початку
+    lessons.sort(key=lambda x: x["Початок"])
+
+    for row in lessons:
 
         start = row["Початок"]
         end = row["Кінець"]
@@ -380,4 +389,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
