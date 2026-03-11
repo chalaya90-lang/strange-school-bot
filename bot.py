@@ -70,6 +70,19 @@ back_kb = ReplyKeyboardMarkup(
     keyboard=[[KeyboardButton(text="⬅ Назад")]],
     resize_keyboard=True
 )
+lesson_times = [
+("08:00","08:35"),
+("08:40","09:15"),
+("09:20","09:55"),
+("10:00","10:35"),
+("10:40","11:15"),
+("11:30","12:05"),
+("12:10","12:45"),
+("12:50","13:25"),
+("13:30","14:05"),
+("14:10","14:45"),
+("14:50","15:25")
+]
 
 
 # ---------------- СТАТИСТИКА ----------------
@@ -299,23 +312,9 @@ async def handler(message: types.Message):
 
     if text == "🔔 Дзвінки":
     
-        rows = schedule_sheet.get_all_records()
+        result = "🔔 Розклад дзвінків:\n\n"
     
-        bells = set()
-    
-        for row in rows:
-    
-            start = row["Початок"]
-            end = row["Кінець"]
-    
-            bells.add((start, end))
-    
-        # сортуємо по часу початку
-        bells = sorted(bells, key=lambda x: x[0])
-    
-        result = "🔔 Дзвінки:\n\n"
-    
-        for i, (start, end) in enumerate(bells, start=1):
+        for i,(start,end) in enumerate(lesson_times, start=1):
             result += f"{i}. {start}-{end}\n"
     
         await message.answer(result)
@@ -420,5 +419,6 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
