@@ -176,37 +176,34 @@ async def handler(message: types.Message):
             await message.answer("Сьогодні уроків немає 😎")
             return
     
-        lessons = sorted(schedule[today], key=lambda x: x[0])
+    lessons = sorted(schedule[today], key=lambda x: x[0])
     
-        lessons_text = ""
+    lessons_text = ""
     
-        for lesson_number, lesson in lessons:
-
-    if lesson_number in lesson_times:
-
-        start, end = lesson_times[lesson_number]
-
-        lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
+    for lesson_number, lesson in lessons:
     
-            if lesson_number <= len(lesson_times):
+        if lesson_number in lesson_times:
     
-                start, end = lesson_times[lesson_number]
+            start, end = lesson_times[lesson_number]
     
-                lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
+            lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
     
-        first_num = lessons[0][0]
-        last_num = lessons[-1][0]
     
-        first_start = lesson_times[first_num][0]
-        last_end = lesson_times[last_num][1]
+    first_num = lessons[0][0]
+    last_num = lessons[-1][0]
     
-        await message.answer(
-            f"📚 Сьогодні до {last_num} уроку\n"
-            f"Початок о {first_start}\n"
-            f"Закінчення о {last_end}\n\n"
-            f"{lessons_text}"
-        )
-
+    first_start = lesson_times[first_num][0]
+    last_end = lesson_times[last_num][1]
+    
+    lesson_count = len(lessons)
+    
+    await message.answer(
+    f"📚 Сьогодні {lesson_count} уроків\n"
+    f"Перший: {first_start}\n"
+    f"Останній: {last_end}\n\n"
+    f"{lessons_text}"
+    )
+    
     return
 
     # ---- ЯКИЙ УРОК ----
@@ -332,6 +329,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
