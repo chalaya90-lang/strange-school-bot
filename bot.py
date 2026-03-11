@@ -445,6 +445,7 @@ async def lesson_notifications():
 # ---------------- MAIN ----------------
 
 async def main():
+    print("РОЗКЛАД:", schedule)
 
     global schedule
 
@@ -461,3 +462,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
