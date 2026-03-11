@@ -192,8 +192,7 @@ async def handler(message: types.Message):
 
     # ---- РОЗКЛАД ----
     if text == "📅 Розклад":
-
-    today = datetime.now().weekday()
+        today = datetime.now().weekday()
 
     if today not in schedule:
         await message.answer("Сьогодні уроків немає 😎")
@@ -343,6 +342,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
