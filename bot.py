@@ -23,6 +23,25 @@ creds_info = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
 creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 gc = gspread.authorize(creds)
 sheet = gc.open("Відсутність учнів").sheet1
+schedule_sheet = gc.open("Відсутність учнів").worksheet("Розклад")
+def load_schedule():
+
+    rows = schedule_sheet.get_all_records()
+
+    schedule = {}
+
+    for row in rows:
+
+        day = int(row["День"])
+        lesson = int(row["Урок"])
+        subject = row["Предмет"]
+
+        if day not in schedule:
+            schedule[day] = []
+
+        schedule[day].append((lesson, subject))
+
+    return schedule
 # ------------------------------------------------
 
 bot = Bot(token=TOKEN)
@@ -337,12 +356,17 @@ async def handler(message: types.Message):
 
 # ---------------- ЗАПУСК ----------------
 async def main():
+    global schedule
+
     load_students()
+
+    schedule = load_schedule()
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
