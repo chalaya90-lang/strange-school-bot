@@ -284,30 +284,30 @@ async def handler(message: types.Message):
         return
 
     # ---- ЯКИЙ УРОК ----
-
+    # ---- ЯКИЙ УРОК ----
     if text == "⏰ Який урок зараз?":
-    today = datetime.now().weekday()
-    now = datetime.now().time()
 
         update_usage(user_id, "current")
 
         today = datetime.now().weekday()
+        now = datetime.now().time()
 
-        lesson = get_current_lesson(today)
+        lesson = None
+
         if today in schedule:
 
-    lessons = sorted(schedule[today], key=lambda x: x[0])
+            lessons = sorted(schedule[today], key=lambda x: x[0])
 
-    for lesson_number, subject in lessons:
+            for lesson_number, subject in lessons:
 
-        start, end = lesson_times[lesson_number]
+                start, end = lesson_times[lesson_number]
 
-        start_t = datetime.strptime(start, "%H:%M").time()
-        end_t = datetime.strptime(end, "%H:%M").time()
+                start_t = datetime.strptime(start, "%H:%M").time()
+                end_t = datetime.strptime(end, "%H:%M").time()
 
-        if start_t <= now <= end_t:
-            lesson = (lesson_number, subject, start, end)
-            break
+                if start_t <= now <= end_t:
+                    lesson = (lesson_number, subject, start, end)
+                    break
 
         if lesson:
 
@@ -536,5 +536,6 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
