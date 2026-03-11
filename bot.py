@@ -184,30 +184,44 @@ async def handler(message: types.Message):
 
     # ---- РОЗКЛАД ----
     if text == "📅 Розклад":
+    
         update_usage(user_id, "schedule")
-
+    
         today = datetime.now().weekday()
-
+    
         if today not in schedule:
             await message.answer("Сьогодні уроків немає 😎")
             return
-
+    
         lessons = sorted(schedule[today], key=lambda x: x[0])
+    
+        if not lessons:
+            await message.answer("Сьогодні уроків немає 😎")
+            return
+    
         lessons_text = ""
-
+    
         for lesson_number, lesson in lessons:
-            start, end = lesson_times[lesson_number - 1]
-            lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
-
-        first_start = lesson_times[lessons[0][0] - 1][0]
-        last_end = lesson_times[lessons[-1][0] - 1][1]
-
+    
+            if lesson_number - 1 < len(lesson_times):
+    
+                start, end = lesson_times[lesson_number - 1]
+    
+                lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
+    
+        first_num, _ = lessons[0]
+        last_num, _ = lessons[-1]
+    
+        first_start = lesson_times[first_num - 1][0]
+        last_end = lesson_times[last_num - 1][1]
+    
         await message.answer(
             f"📚 Сьогодні {len(lessons)} уроків\n"
             f"Початок о {first_start}\n"
             f"Закінчення о {last_end}\n\n"
             f"{lessons_text}"
         )
+    
         return
 
     # ---- ЯКИЙ УРОК ----
@@ -329,4 +343,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
