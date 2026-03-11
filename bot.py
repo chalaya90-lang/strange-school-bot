@@ -174,20 +174,13 @@ def get_current_lesson(today):
         return None
 
     now = datetime.now().time()
-    
-    print("РОЗКЛАД СЬОГОДНІ:", schedule.get(today))
-    
+
     for lesson_number, subject in schedule[today]:
 
         start, end = lesson_times[lesson_number]
 
         start_t = datetime.strptime(start, "%H:%M").time()
         end_t = datetime.strptime(end, "%H:%M").time()
-
-        if start_t <= now <= end_t:
-            return lesson_number, subject, start, end
-
-    return None
 
         if start_t <= now <= end_t:
             return lesson_number, subject, start, end
@@ -485,5 +478,6 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
