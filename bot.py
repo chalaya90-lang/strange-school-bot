@@ -149,6 +149,28 @@ def save_absence(name, reason):
 
 def get_current_lesson(today):
 
+    if today not in schedule:
+        return None
+
+    now = datetime.now().time()
+
+    lessons = sorted(schedule[today], key=lambda x: x[0])
+
+    for lesson_number, subject in lessons:
+
+        if lesson_number not in lesson_times:
+            continue
+
+        start, end = lesson_times[lesson_number]
+
+        start_t = datetime.strptime(start, "%H:%M").time()
+        end_t = datetime.strptime(end, "%H:%M").time()
+
+        if start_t <= now <= end_t:
+            return lesson_number, subject, start, end
+
+    return None
+
     now = datetime.now().time()
 
     if today not in schedule:
@@ -266,7 +288,7 @@ async def handler(message: types.Message):
 
         else:
 
-            await message.answer("Зараз перерва 😎")
+            await message.answer("⏳ Зараз перерва")
 
         return
 
@@ -482,3 +504,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
