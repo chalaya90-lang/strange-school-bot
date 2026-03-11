@@ -15,7 +15,7 @@ TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
 ADMIN_NAMES = {"Марія Чала", "Лілія Шрам"}
 
 
-# ---------------- GOOGLE SHEETS ----------------
+# ---------- GOOGLE SHEETS ----------
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -30,7 +30,35 @@ sheet = gc.open("Відсутність учнів").sheet1
 schedule_sheet = gc.open("Відсутність учнів").worksheet("Розклад")
 
 
-# ---------------- ДЗВІНКИ ----------------
+def load_schedule():
+
+    rows = schedule_sheet.get_all_records()
+    schedule = {}
+
+    for row in rows:
+
+        try:
+            day = int(row["День"])
+            lesson = int(row["Урок"])
+            subject = str(row["Предмет"]).strip()
+        except:
+            continue
+
+        if subject == "":
+            continue
+
+        if day not in schedule:
+            schedule[day] = []
+
+        schedule[day].append((lesson, subject))
+
+    for day in schedule:
+        schedule[day] = sorted(schedule[day], key=lambda x: x[0])
+
+    return schedule
+
+
+# ---------- ДЗВІНКИ ----------
 
 lesson_times = {
 
@@ -49,57 +77,18 @@ lesson_times = {
 }
 
 
-# ---------------- LOAD SCHEDULE ----------------
-
-def load_schedule():
-
-    rows = schedule_sheet.get_all_records()
-
-    schedule = {}
-
-    for row in rows:
-
-        try:
-
-            day = int(row["День"])
-            lesson = int(row["Урок"])
-            subject = str(row["Предмет"]).strip()
-
-        except:
-            continue
-
-        if subject == "":
-            continue
-
-        if lesson not in lesson_times:
-            continue
-
-        if day not in schedule:
-            schedule[day] = []
-
-        schedule[day].append((lesson, subject))
-
-    for day in schedule:
-        schedule[day] = sorted(schedule[day], key=lambda x: x[0])
-
-    return schedule
-
-
-# ---------------- BOT ----------------
+# ---------- BOT ----------
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-schedule = {}
-
 users = set()
 user_names = {}
 user_states = {}
-
 usage_stats = {}
 
 
-# ---------------- КЛАВІАТУРА ----------------
+# ---------- КЛАВІАТУРА ----------
 
 main_kb = ReplyKeyboardMarkup(
     keyboard=[
@@ -120,7 +109,7 @@ back_kb = ReplyKeyboardMarkup(
 )
 
 
-# ---------------- СТАТИСТИКА ----------------
+# ---------- СТАТИСТИКА ----------
 
 def update_usage(user_id, action):
 
@@ -130,7 +119,7 @@ def update_usage(user_id, action):
     usage_stats[user_id][action] += 1
 
 
-# ---------------- СТУДЕНТИ ----------------
+# ---------- ФАЙЛИ ----------
 
 def load_students():
 
@@ -141,7 +130,7 @@ def load_students():
                 uid, name = line.strip().split("|")
                 user_names[int(uid)] = name
 
-    except FileNotFoundError:
+    except:
         pass
 
 
@@ -150,8 +139,6 @@ def save_student(user_id, name):
     with open("students.txt", "a", encoding="utf-8") as f:
         f.write(f"{user_id}|{name}\n")
 
-
-# ---------------- ВІДСУТНІСТЬ ----------------
 
 def save_absence(name, reason):
 
@@ -163,17 +150,17 @@ def save_absence(name, reason):
     sheet.append_row([now, name, reason])
 
 
-# ---------------- УРОК ЗАРАЗ ----------------
+# ---------- УРОК ЗАРАЗ ----------
 
-def get_current_lesson(today):
+def get_current_lesson():
 
-    global schedule
     schedule = load_schedule()
+
+    today = datetime.now().weekday()
+    now = datetime.now().time()
 
     if today not in schedule:
         return None
-
-    now = datetime.now().time()
 
     for lesson_number, subject in schedule[today]:
 
@@ -188,7 +175,7 @@ def get_current_lesson(today):
     return None
 
 
-# ---------------- HANDLER ----------------
+# ---------- HANDLER ----------
 
 @dp.message()
 async def handler(message: types.Message):
@@ -200,7 +187,7 @@ async def handler(message: types.Message):
 
     state = user_states.get(user_id)
 
-    # ---- START ----
+    # ---------- START ----------
 
     if text == "/start":
 
@@ -213,7 +200,8 @@ async def handler(message: types.Message):
         await message.answer("Головне меню 📚", reply_markup=main_kb)
         return
 
-    # ---- ІМ'Я ----
+
+    # ---------- ІМ'Я ----------
 
     if state == "waiting_name":
 
@@ -229,31 +217,28 @@ async def handler(message: types.Message):
         await message.answer("Збережено ✅", reply_markup=main_kb)
         return
 
-    # ---- РОЗКЛАД ----
+
+    # ---------- РОЗКЛАД ----------
 
     if text == "📅 Розклад":
 
         update_usage(user_id, "schedule")
 
-        global schedule
         schedule = load_schedule()
-
         today = datetime.now().weekday()
 
         if today not in schedule:
-
             await message.answer("Сьогодні уроків немає 😎")
             return
 
         lessons = schedule[today]
 
-        txt = ""
+        text_lessons = ""
 
         for lesson_number, subject in lessons:
 
             start, end = lesson_times[lesson_number]
-
-            txt += f"{lesson_number}. {subject} ({start}-{end})\n"
+            text_lessons += f"{lesson_number}. {subject} ({start}-{end})\n"
 
         first = lessons[0][0]
         last = lessons[-1][0]
@@ -263,20 +248,19 @@ async def handler(message: types.Message):
             f"📚 Сьогодні {len(lessons)} уроків\n"
             f"Перший: {lesson_times[first][0]}\n"
             f"Останній: {lesson_times[last][1]}\n\n"
-            f"{txt}"
+            f"{text_lessons}"
         )
 
         return
 
-    # ---- ЯКИЙ УРОК ----
+
+    # ---------- ЯКИЙ УРОК ----------
 
     if text == "⏰ Який урок зараз?":
 
         update_usage(user_id, "current")
 
-        today = datetime.now().weekday()
-
-        lesson = get_current_lesson(today)
+        lesson = get_current_lesson()
 
         if lesson:
 
@@ -292,7 +276,8 @@ async def handler(message: types.Message):
 
         return
 
-    # ---- ДЗВІНКИ ----
+
+    # ---------- ДЗВІНКИ ----------
 
     if text == "🔔 Дзвінки":
 
@@ -301,11 +286,12 @@ async def handler(message: types.Message):
         for num, (start, end) in lesson_times.items():
             txt += f"{num}. {start}-{end}\n"
 
-        await message.answer(f"🔔 Скорочені дзвінки\n\n{txt}")
+        await message.answer(f"🔔 Дзвінки\n\n{txt}")
 
         return
 
-    # ---- ВІДСУТНІСТЬ ----
+
+    # ---------- ВІДСУТНІСТЬ ----------
 
     if text == "📩 Повідомити про відсутність":
 
@@ -314,6 +300,7 @@ async def handler(message: types.Message):
         await message.answer("Напишіть причину ✍️", reply_markup=back_kb)
 
         return
+
 
     if state == "waiting_absence":
 
@@ -325,7 +312,8 @@ async def handler(message: types.Message):
 
         return
 
-    # ---- ОГОЛОШЕННЯ ----
+
+    # ---------- ОГОЛОШЕННЯ ----------
 
     if text == "📢 Оголошення":
 
@@ -337,9 +325,10 @@ async def handler(message: types.Message):
 
         user_states[user_id] = "waiting_announcement"
 
-        await message.answer("Напишіть оголошення 📝")
+        await message.answer("Напишіть оголошення")
 
         return
+
 
     if state == "waiting_announcement":
 
@@ -350,127 +339,72 @@ async def handler(message: types.Message):
             except:
                 pass
 
-        await message.answer("Оголошення розіслано ✅")
+        await message.answer("Оголошення розіслано")
 
         return
 
 
-# ---------------- БУДИЛЬНИК ----------------
+    # ---------- СТАТИСТИКА ----------
 
-async def morning_alarm():
+    if text == "📊 Статистика":
 
-    while True:
+        name = user_names.get(user_id)
 
-        global schedule
-        schedule = load_schedule()
+        if name not in ADMIN_NAMES:
+            await message.answer("Доступ тільки для адміністрації 🔒")
+            return
 
-        now = datetime.now()
+        today = datetime.now().strftime("%d.%m.%Y")
 
-        if now.hour == 7 and now.minute == 45:
-
-            today = now.weekday()
-
-            if today in schedule:
-
-                lessons = schedule[today]
-
-                first = lessons[0][0]
-
-                start = lesson_times[first][0]
-
-                text = (
-                    "☀️ Доброго ранку\n"
-                    f"Сьогодні {len(lessons)} уроків\n"
-                    f"Перший о {start}"
-                )
-
-                for user in users:
-
-                    try:
-                        await bot.send_audio(
-                            user,
-                            audio=FSInputFile("alarm.mp3"),
-                            caption=text
-                        )
-                    except:
-                        pass
-
-        await asyncio.sleep(60)
-
-
-# ---------------- АВТО ДЗВІНКИ ----------------
-
-async def lesson_notifications():
-
-    last_lesson = None
-
-    while True:
-
-        global schedule
-        schedule = load_schedule()
-
-        now = datetime.now()
-        today = now.weekday()
-
-        if today in schedule:
-
-            for lesson_number, subject in schedule[today]:
-
-                start, end = lesson_times[lesson_number]
-
-                start_t = datetime.strptime(start, "%H:%M").time()
-
-                if now.hour == start_t.hour and now.minute == start_t.minute:
-
-                    if last_lesson != lesson_number:
-
-                        text = (
-                            f"🔔 Почався {lesson_number} урок\n"
-                            f"{subject}\n"
-                            f"{start}-{end}"
-                        )
-
-                        for user in users:
-
-                            try:
-                                await bot.send_message(user, text)
-                            except:
-                                pass
-
-                        last_lesson = lesson_number
-
-        await asyncio.sleep(30)
-        
-        # ---------------- АВТО ОНОВЛЕННЯ РОЗКЛАДУ ----------------
-
-async def refresh_schedule():
-
-    global schedule
-
-    while True:
+        count = 0
 
         try:
-            schedule = load_schedule()
+            with open("absences.txt", "r", encoding="utf-8") as f:
+
+                for line in f:
+
+                    if today in line:
+                        count += 1
+
         except:
             pass
 
-        await asyncio.sleep(60)
+        await message.answer(f"📊 Відсутніх сьогодні: {count}")
+
+        return
 
 
-# ---------------- MAIN ----------------
+    # ---------- РЕЙТИНГ ----------
+
+    if text == "🏆 Рейтинг активності":
+
+        ranking = []
+
+        for uid, stats in usage_stats.items():
+
+            total = stats["schedule"] + stats["current"]
+
+            name = user_names.get(uid, "Невідомий")
+
+            ranking.append((name, total))
+
+        ranking.sort(key=lambda x: x[1], reverse=True)
+
+        result = "🏆 Рейтинг активності\n\n"
+
+        for i, (name, total) in enumerate(ranking[:5], start=1):
+            result += f"{i}. {name} — {total}\n"
+
+        await message.answer(result)
+
+        return
+
+
+# ---------- MAIN ----------
 
 async def main():
-    print("РОЗКЛАД:", schedule)
-
-    global schedule
 
     load_students()
-
-    schedule = load_schedule()
-
-    asyncio.create_task(morning_alarm())
-    asyncio.create_task(lesson_notifications())
-    asyncio.create_task(refresh_schedule())
 
     await dp.start_polling(bot)
 
@@ -478,6 +412,3 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
-
-
-
