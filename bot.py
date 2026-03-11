@@ -15,7 +15,7 @@ TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
 ADMIN_NAMES = {"Марія Чала", "Лілія Шрам"}
 
 
-# ---------- GOOGLE SHEETS ----------
+# ---------------- GOOGLE SHEETS ----------------
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -30,54 +30,7 @@ sheet = gc.open("Відсутність учнів").sheet1
 schedule_sheet = gc.open("Відсутність учнів").worksheet("Розклад")
 
 
-def load_schedule():
-
-    rows = schedule_sheet.get_all_records()
-    schedule = {}
-
-    for row in rows:
-
-        try:
-            day = int(row["День"])
-            lesson = int(row["Урок"])
-            subject = str(row["Предмет"]).strip()
-        except:
-            continue
-
-        if subject == "":
-            continue
-
-        if day not in schedule:
-            schedule[day] = []
-
-        schedule[day].append((lesson, subject))
-
-    for day in schedule:
-        schedule[day] = sorted(schedule[day], key=lambda x: x[0])
-
-    return schedule
-
-
-# ---------- ДЗВІНКИ ----------
-
-lesson_times = {
-
-    1: ("08:00", "08:35"),
-    2: ("08:40", "09:15"),
-    3: ("09:20", "09:55"),
-    4: ("10:00", "10:35"),
-    5: ("10:40", "11:15"),
-    6: ("11:30", "12:05"),
-    7: ("12:10", "12:45"),
-    8: ("12:50", "13:25"),
-    9: ("13:30", "14:05"),
-    10: ("14:10", "14:45"),
-    11: ("14:50", "15:25")
-
-}
-
-
-# ---------- BOT ----------
+# ---------------- BOT ----------------
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -88,13 +41,12 @@ user_states = {}
 usage_stats = {}
 
 
-# ---------- КЛАВІАТУРА ----------
+# ---------------- КЛАВІАТУРА ----------------
 
 main_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📅 Розклад")],
         [KeyboardButton(text="⏰ Який урок зараз?")],
-        [KeyboardButton(text="🔔 Дзвінки")],
         [KeyboardButton(text="📩 Повідомити про відсутність")],
         [KeyboardButton(text="📢 Оголошення")],
         [KeyboardButton(text="📊 Статистика")],
@@ -109,7 +61,7 @@ back_kb = ReplyKeyboardMarkup(
 )
 
 
-# ---------- СТАТИСТИКА ----------
+# ---------------- СТАТИСТИКА ----------------
 
 def update_usage(user_id, action):
 
@@ -119,7 +71,7 @@ def update_usage(user_id, action):
     usage_stats[user_id][action] += 1
 
 
-# ---------- ФАЙЛИ ----------
+# ---------------- ФАЙЛИ ----------------
 
 def load_students():
 
@@ -150,45 +102,65 @@ def save_absence(name, reason):
     sheet.append_row([now, name, reason])
 
 
-# ---------- УРОК ЗАРАЗ ----------
+# ---------------- УРОК ЗАРАЗ ----------------
 
 def get_current_lesson():
 
+    rows = schedule_sheet.get_all_records()
+
     now = datetime.now().time()
+    today = datetime.now().weekday()
 
-    # визначаємо номер уроку по часу
-    current_lesson_number = None
+    for row in rows:
 
-    for num, (start, end) in lesson_times.items():
+        try:
+            day = int(row["День"])
+        except:
+            continue
+
+        if day != today:
+            continue
+
+        start = row["Початок"]
+        end = row["Кінець"]
+        subject = row["Предмет"]
 
         start_t = datetime.strptime(start, "%H:%M").time()
         end_t = datetime.strptime(end, "%H:%M").time()
 
         if start_t <= now <= end_t:
-            current_lesson_number = num
-            break
-
-    if current_lesson_number is None:
-        return None
-
-    schedule = load_schedule()
-    today = datetime.now().weekday()
-
-    if today not in schedule:
-        return None
-
-    for lesson_number, subject in schedule[today]:
-
-        if lesson_number == current_lesson_number:
-
-            start, end = lesson_times[lesson_number]
-
-            return lesson_number, subject, start, end
+            return start, end, subject
 
     return None
 
 
-# ---------- HANDLER ----------
+# ---------------- СЬОГОДНІШНІЙ РОЗКЛАД ----------------
+
+def get_today_schedule():
+
+    rows = schedule_sheet.get_all_records()
+    today = datetime.now().weekday()
+
+    lessons = []
+
+    for row in rows:
+
+        try:
+            day = int(row["День"])
+        except:
+            continue
+
+        if day != today:
+            continue
+
+        lessons.append(row)
+
+    lessons.sort(key=lambda x: x["Початок"])
+
+    return lessons
+
+
+# ---------------- HANDLER ----------------
 
 @dp.message()
 async def handler(message: types.Message):
@@ -199,6 +171,7 @@ async def handler(message: types.Message):
     users.add(user_id)
 
     state = user_states.get(user_id)
+
 
     # ---------- START ----------
 
@@ -237,32 +210,23 @@ async def handler(message: types.Message):
 
         update_usage(user_id, "schedule")
 
-        schedule = load_schedule()
-        today = datetime.now().weekday()
+        lessons = get_today_schedule()
 
-        if today not in schedule:
+        if not lessons:
             await message.answer("Сьогодні уроків немає 😎")
             return
 
-        lessons = schedule[today]
-
         text_lessons = ""
 
-        for lesson_number, subject in lessons:
+        for row in lessons:
 
-            start, end = lesson_times[lesson_number]
-            text_lessons += f"{lesson_number}. {subject} ({start}-{end})\n"
+            start = row["Початок"]
+            end = row["Кінець"]
+            subject = row["Предмет"]
 
-        first = lessons[0][0]
-        last = lessons[-1][0]
+            text_lessons += f"{subject} ({start}-{end})\n"
 
-        await message.answer(
-
-            f"📚 Сьогодні {len(lessons)} уроків\n"
-            f"Перший: {lesson_times[first][0]}\n"
-            f"Останній: {lesson_times[last][1]}\n\n"
-            f"{text_lessons}"
-        )
+        await message.answer(f"📚 Сьогодні:\n\n{text_lessons}")
 
         return
 
@@ -277,29 +241,15 @@ async def handler(message: types.Message):
 
         if lesson:
 
-            num, subject, start, end = lesson
+            start, end, subject = lesson
 
             await message.answer(
-                f"📖 Зараз {num} урок\n{subject}\n{start}-{end}"
+                f"📖 Зараз урок\n{subject}\n{start}-{end}"
             )
 
         else:
 
             await message.answer("⏳ Зараз перерва")
-
-        return
-
-
-    # ---------- ДЗВІНКИ ----------
-
-    if text == "🔔 Дзвінки":
-
-        txt = ""
-
-        for num, (start, end) in lesson_times.items():
-            txt += f"{num}. {start}-{end}\n"
-
-        await message.answer(f"🔔 Дзвінки\n\n{txt}")
 
         return
 
@@ -413,7 +363,7 @@ async def handler(message: types.Message):
         return
 
 
-# ---------- MAIN ----------
+# ---------------- MAIN ----------------
 
 async def main():
 
@@ -425,5 +375,3 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
-
-
