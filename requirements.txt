@@ -2,4 +2,5 @@ aiogram
 gspread
 google-auth
 google-auth-oauthlib
+pytz
 google-auth-httplib2
