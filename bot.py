@@ -76,17 +76,18 @@ def update_usage(user_id, action):
 
 lesson_times = {
 
-    1: ("08:00", "08:35"),
-    2: ("08:40", "09:15"),
-    3: ("09:20", "09:55"),
-    4: ("10:00", "10:35"),
-    5: ("10:40", "11:15"),
-    6: ("11:30", "12:05"),
-    7: ("12:10", "12:45"),
-    8: ("12:50", "13:25"),
-    9: ("14:00", "14:45"),
-    10: ("14:50", "15:25"),
-    11: ("15:30", "16:05")
+1: ("08:00","08:35"),
+2: ("08:40","09:15"),
+3: ("09:20","09:55"),
+4: ("10:00","10:35"),
+5: ("10:40","11:15"),
+6: ("11:30","12:05"),
+7: ("12:10","12:45"),
+8: ("12:50","13:25"),
+9: ("13:30","14:05"),
+10: ("14:10","14:45"),
+11: ("14:50","15:25")
+
 }
 
 # ---------------- КЛАВІАТУРА ----------------
@@ -305,6 +306,99 @@ async def handler(message: types.Message):
         await message.answer(f"🔔 Скорочені дзвінки\n\n{text_times}")
 
         return
+        # ---- ПОВІДОМИТИ ПРО ВІДСУТНІСТЬ ----
+if text == "📩 Повідомити про відсутність":
+    user_states[user_id] = "waiting_absence"
+    await message.answer("Напишіть причину ✍️", reply_markup=back_kb)
+    return
+
+if state == "waiting_absence":
+    name = user_names.get(user_id, "Невідомий")
+    save_absence(name, text)
+    user_states[user_id] = "menu"
+    await message.answer("Запис додано в журнал ✅", reply_markup=main_kb)
+    return
+
+
+# ---- ОГОЛОШЕННЯ ----
+if text == "📢 Оголошення":
+
+    name = user_names.get(user_id)
+
+    if name not in ADMIN_NAMES:
+        await message.answer("Доступ тільки для адміністрації 🔒")
+        return
+
+    user_states[user_id] = "waiting_announcement"
+    await message.answer("Введіть текст оголошення 📝", reply_markup=back_kb)
+    return
+
+
+if state == "waiting_announcement":
+
+    for u in users:
+        try:
+            await bot.send_message(u, f"📢 ОГОЛОШЕННЯ:\n\n{text}")
+        except:
+            pass
+
+    user_states[user_id] = "menu"
+    await message.answer("Оголошення розіслано ✅", reply_markup=main_kb)
+    return
+
+
+# ---- СТАТИСТИКА ----
+if text == "📊 Статистика":
+
+    name = user_names.get(user_id)
+
+    if name not in ADMIN_NAMES:
+        await message.answer("Доступ тільки для адміністрації 🔒")
+        return
+
+    today = datetime.now().strftime("%d.%m.%Y")
+    count = 0
+
+    try:
+        with open("absences.txt", "r", encoding="utf-8") as f:
+            for line in f:
+                if today in line:
+                    count += 1
+    except FileNotFoundError:
+        await message.answer("Записів ще немає")
+        return
+
+    await message.answer(f"📊 Відсутніх сьогодні: {count}")
+    return
+
+
+# ---- РЕЙТИНГ ----
+if text == "🏆 Рейтинг активності":
+
+    if not usage_stats:
+        await message.answer("Поки що всі сонні 😴")
+        return
+
+    ranking = []
+
+    for uid, stats in usage_stats.items():
+
+        total = stats["schedule"] + stats["current"]
+        name = user_names.get(uid, "Невідомий")
+
+        ranking.append((name, total))
+
+    ranking.sort(key=lambda x: x[1], reverse=True)
+
+    result = "🏆 Рейтинг активності:\n\n"
+
+    for i, (name, total) in enumerate(ranking[:5], start=1):
+        result += f"{i}. {name} — {total}\n"
+
+    result += "\nДиректор усе бачить 👀"
+
+    await message.answer(result)
+    return
 
 
 # ---------------- РАНКОВИЙ БУДИЛЬНИК ----------------
@@ -369,3 +463,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
