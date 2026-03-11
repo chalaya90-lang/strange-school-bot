@@ -192,7 +192,7 @@ async def handler(message: types.Message):
             await message.answer("Сьогодні уроків немає 😎")
             return
 
-        lessons = schedule[today]
+        lessons = sorted(schedule[today], key=lambda x: x[0])
         lessons_text = ""
 
         for lesson_number, lesson in lessons:
@@ -329,3 +329,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
