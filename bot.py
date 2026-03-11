@@ -1,13 +1,18 @@
 import asyncio
 import os
 import json
+
 from datetime import datetime
+import pytz
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, FSInputFile
 
 import gspread
 from google.oauth2.service_account import Credentials
+
+
+kyiv = pytz.timezone("Europe/Kyiv")
 
 
 TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
@@ -94,7 +99,7 @@ def save_student(user_id, name):
 
 def save_absence(name, reason):
 
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now = datetime.now(kyiv).strftime("%d.%m.%Y %H:%M")
 
     with open("absences.txt", "a", encoding="utf-8") as f:
         f.write(f"{now} | {name} | {reason}\n")
@@ -108,8 +113,8 @@ def get_current_lesson():
 
     rows = schedule_sheet.get_all_records()
 
-    now = datetime.now().time()
-    today = datetime.now().weekday()
+    now = datetime.now(kyiv).time()
+    today = (datetime.utcnow().hour + 3 >= 0) and datetime.utcnow().weekday()
 
     for row in rows:
 
@@ -139,7 +144,7 @@ def get_current_lesson():
 def get_today_schedule():
 
     rows = schedule_sheet.get_all_records()
-    today = datetime.now().weekday()
+    today = datetime.now(kyiv).weekday()
 
     lessons = []
 
@@ -317,7 +322,7 @@ async def handler(message: types.Message):
             await message.answer("Доступ тільки для адміністрації 🔒")
             return
 
-        today = datetime.now().strftime("%d.%m.%Y")
+        today = datetime.now(kyiv)).strftime("%d.%m.%Y")
 
         count = 0
 
@@ -375,3 +380,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
