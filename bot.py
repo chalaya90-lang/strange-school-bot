@@ -294,10 +294,36 @@ async def handler(message: types.Message):
         await message.answer("Запис додано ✅", reply_markup=main_kb)
 
         return
+        
+# ---------- ДЗВІНКИ ----------
 
+    if text == "🔔 Дзвінки":
+    
+        rows = schedule_sheet.get_all_records()
+    
+        bells = []
+    
+        for row in rows:
+    
+            start = row["Початок"]
+            end = row["Кінець"]
+    
+            pair = f"{start}-{end}"
+    
+            if pair not in bells:
+                bells.append(pair)
+    
+        result = "🔔 Дзвінки:\n\n"
+    
+        for i, bell in enumerate(bells, start=1):
+            result += f"{i}. {bell}\n"
+    
+        await message.answer(result)
+    
+        return
 
 # ---------- ОГОЛОШЕННЯ ----------
-
+    
     if text == "📢 Оголошення":
 
         name = user_names.get(user_id)
@@ -394,3 +420,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
