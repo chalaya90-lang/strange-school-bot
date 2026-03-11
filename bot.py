@@ -42,56 +42,64 @@ def update_usage(user_id, action):
 
 # ---------------- СКОРОЧЕНІ ДЗВІНКИ ----------------
 lesson_times = [
-    ("08:00", "08:35"),
-    ("08:40", "09:15"),
-    ("09:20", "09:55"),
-    ("10:00", "10:35"),
-    ("10:40", "11:15"),
-    ("11:20", "11:55"),
-    ("12:00", "12:35"),
-    ("12:40", "13:15"),
-    ("13:20", "13:55"),
-    ("14:00", "14:35"),
-    ("14:40", "15:15"),
-    ("15:20", "15:55"),
+    ("08:00", "08:35"),  # 1
+    ("08:40", "09:15"),  # 2
+    ("09:20", "09:55"),  # 3
+    ("10:00", "10:35"),  # 4
+    ("10:40", "11:15"),  # 5
+    ("11:30", "12:05"),  # 6
+    ("12:10", "12:45"),  # 7
+    ("12:50", "13:25"),  # 8
+    ("13:30", "14:05"),  # 9
+    ("14:10", "14:45"),  # 10
+    ("14:50", "15:25"),  # 11
 ]
 
 # ---------------- РОЗКЛАД ----------------
 schedule = {
-    0: [(6,"Англійська мова"),
+    0: [  # понеділок
+        (6,"Англійська мова"),
         (7,"Англійська мова"),
         (8,"Фізична культура"),
         (9,"Інтегрований курс"),
         (10,"Математика"),
-        (11,"Математика")],
+        (11,"Математика"),
+    ],
 
-    1: [(1,"Музичне мистецтво"),
+    1: [  # вівторок
+        (1,"Музичне мистецтво"),
         (6,"Українська мова"),
         (7,"Українська мова"),
         (8,"Географія"),
         (9,"Географія"),
-        (11,"Польська мова")],
+        (10,"Польська мова"),
+    ],
 
-    2: [(1,"Технології"),
+    2: [  # середа
+        (1,"Технології"),
         (2,"Технології"),
         (3,"Фізична культура"),
         (5,"Інформатика"),
         (6,"Українська література"),
         (7,"Українська література"),
-        (8,"Англійська мова")],
+        (8,"Англійська мова"),
+    ],
 
-    3: [(6,"Історія України"),
+    3: [  # четвер
+        (6,"Історія України"),
         (7,"Історія України"),
         (8,"Математика"),
         (9,"Математика"),
         (10,"Пізнаємо природу"),
-        (11,"Пізнаємо природу")],
+    ],
 
-    4: [(6,"Українська мова"),
+    4: [  # пʼятниця
+        (6,"Українська мова"),
         (7,"Українська мова"),
         (8,"Фізична культура"),
         (9,"Математика"),
-        (10,"Вчимося жити разом")]
+        (10,"Вчимося жити разом"),
+    ]
 }
 
 # ---------------- КЛАВІАТУРА ----------------
@@ -184,45 +192,37 @@ async def handler(message: types.Message):
 
     # ---- РОЗКЛАД ----
     if text == "📅 Розклад":
-    
-        update_usage(user_id, "schedule")
-    
-        today = datetime.now().weekday()
-    
-        if today not in schedule:
-            await message.answer("Сьогодні уроків немає 😎")
-            return
-    
-        lessons = sorted(schedule[today], key=lambda x: x[0])
-    
-        if not lessons:
-            await message.answer("Сьогодні уроків немає 😎")
-            return
-    
-        lessons_text = ""
-    
-        for lesson_number, lesson in lessons:
-    
-            if lesson_number - 1 < len(lesson_times):
-    
-                start, end = lesson_times[lesson_number - 1]
-    
-                lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
-    
-        first_num, _ = lessons[0]
-        last_num, _ = lessons[-1]
-    
-        first_start = lesson_times[first_num - 1][0]
-        last_end = lesson_times[last_num - 1][1]
-    
-        await message.answer(
-            f"📚 Сьогодні {len(lessons)} уроків\n"
-            f"Початок о {first_start}\n"
-            f"Закінчення о {last_end}\n\n"
-            f"{lessons_text}"
-        )
-    
+
+    today = datetime.now().weekday()
+
+    if today not in schedule:
+        await message.answer("Сьогодні уроків немає 😎")
         return
+
+    lessons = sorted(schedule[today], key=lambda x: x[0])
+
+    lessons_text = ""
+
+    for lesson_number, lesson in lessons:
+
+        if lesson_number <= len(lesson_times):
+
+            start, end = lesson_times[lesson_number - 1]
+
+            lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
+
+    first_num, _ = lessons[0]
+    last_num, _ = lessons[-1]
+
+    first_start = lesson_times[first_num - 1][0]
+    last_end = lesson_times[last_num - 1][1]
+
+    await message.answer(
+        f"📚 Сьогодні {len(lessons)} уроків\n"
+        f"Початок о {first_start}\n"
+        f"Закінчення о {last_end}\n\n"
+        f"{lessons_text}"
+    )
 
     # ---- ЯКИЙ УРОК ----
     if text == "⏰ Який урок зараз?":
@@ -343,5 +343,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
