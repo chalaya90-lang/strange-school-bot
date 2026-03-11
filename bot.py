@@ -38,14 +38,29 @@ def load_schedule():
 
     for row in rows:
 
-        day = int(row["День"])
-        lesson = int(row["Урок"])
-        subject = row["Предмет"]
+        try:
+
+            day = int(row["День"])
+            lesson = int(row["Урок"])
+            subject = str(row["Предмет"]).strip()
+
+        except:
+            continue
+
+        if subject == "":
+            continue
+
+        if lesson not in lesson_times:
+            continue
 
         if day not in schedule:
             schedule[day] = []
 
         schedule[day].append((lesson, subject))
+
+    # сортуємо уроки
+    for day in schedule:
+        schedule[day] = sorted(schedule[day], key=lambda x: x[0])
 
     return schedule
 
@@ -271,12 +286,28 @@ async def handler(message: types.Message):
     # ---- ЯКИЙ УРОК ----
 
     if text == "⏰ Який урок зараз?":
+    today = datetime.now().weekday()
+    now = datetime.now().time()
 
         update_usage(user_id, "current")
 
         today = datetime.now().weekday()
 
         lesson = get_current_lesson(today)
+        if today in schedule:
+
+    lessons = sorted(schedule[today], key=lambda x: x[0])
+
+    for lesson_number, subject in lessons:
+
+        start, end = lesson_times[lesson_number]
+
+        start_t = datetime.strptime(start, "%H:%M").time()
+        end_t = datetime.strptime(end, "%H:%M").time()
+
+        if start_t <= now <= end_t:
+            lesson = (lesson_number, subject, start, end)
+            break
 
         if lesson:
 
@@ -494,6 +525,7 @@ async def main():
     load_students()
 
     schedule = load_schedule()
+    print("SCHEDULE:", schedule)
 
     asyncio.create_task(morning_alarm())
     asyncio.create_task(lesson_notifications())
@@ -504,4 +536,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
