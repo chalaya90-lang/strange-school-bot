@@ -174,13 +174,20 @@ def get_current_lesson(today):
         return None
 
     now = datetime.now().time()
-
+    
+    print("РОЗКЛАД СЬОГОДНІ:", schedule.get(today))
+    
     for lesson_number, subject in schedule[today]:
 
         start, end = lesson_times[lesson_number]
 
         start_t = datetime.strptime(start, "%H:%M").time()
         end_t = datetime.strptime(end, "%H:%M").time()
+
+        if start_t <= now <= end_t:
+            return lesson_number, subject, start, end
+
+    return None
 
         if start_t <= now <= end_t:
             return lesson_number, subject, start, end
@@ -440,6 +447,21 @@ async def lesson_notifications():
                         last_lesson = lesson_number
 
         await asyncio.sleep(30)
+        
+        # ---------------- АВТО ОНОВЛЕННЯ РОЗКЛАДУ ----------------
+
+async def refresh_schedule():
+
+    global schedule
+
+    while True:
+
+        try:
+            schedule = load_schedule()
+        except:
+            pass
+
+        await asyncio.sleep(60)
 
 
 # ---------------- MAIN ----------------
@@ -455,6 +477,7 @@ async def main():
 
     asyncio.create_task(morning_alarm())
     asyncio.create_task(lesson_notifications())
+    asyncio.create_task(refresh_schedule())
 
     await dp.start_polling(bot)
 
@@ -462,4 +485,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
