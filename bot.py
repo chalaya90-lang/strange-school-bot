@@ -180,13 +180,16 @@ async def handler(message: types.Message):
     
     lessons_text = ""
     
-    for lesson_number, lesson in lessons:
+    for lesson in lessons:
     
-        if lesson_number in lesson_times:
+    lesson_number = lesson[0]
+    subject = lesson[1]
     
-            start, end = lesson_times[lesson_number]
+    if lesson_number in lesson_times:
     
-            lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
+        start, end = lesson_times[lesson_number]
+    
+        lessons_text += f"{lesson_number}. {subject} ({start}-{end})\n"
     
     
     first_num = lessons[0][0]
@@ -199,8 +202,8 @@ async def handler(message: types.Message):
     
     await message.answer(
     f"📚 Сьогодні {lesson_count} уроків\n"
-    f"Перший: {first_start}\n"
-    f"Останній: {last_end}\n\n"
+    f"Перший урок: {first_start}\n"
+    f"Останній урок: {last_end}\n\n"
     f"{lessons_text}"
     )
     
@@ -329,6 +332,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
