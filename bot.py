@@ -186,25 +186,6 @@ def get_current_lesson(today):
 
     return None
 
-    now = datetime.now().time()
-
-    if today not in schedule:
-        return None
-
-    for lesson_number, subject in schedule[today]:
-
-        if lesson_number in lesson_times:
-
-            start, end = lesson_times[lesson_number]
-
-            start_t = datetime.strptime(start, "%H:%M").time()
-            end_t = datetime.strptime(end, "%H:%M").time()
-
-            if start_t <= now <= end_t:
-                return lesson_number, subject, start, end
-
-    return None
-
 
 # ---------------- HANDLER ----------------
 
@@ -525,7 +506,7 @@ async def main():
     load_students()
 
     schedule = load_schedule()
-    print("SCHEDULE:", schedule)
+    print(schedule)
 
     asyncio.create_task(morning_alarm())
     asyncio.create_task(lesson_notifications())
@@ -536,6 +517,7 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
 
 
