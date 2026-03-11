@@ -60,19 +60,19 @@ def update_usage(user_id, action):
 
 
 # ---------------- СКОРОЧЕНІ ДЗВІНКИ ----------------
-lesson_times = [
-    ("08:00", "08:35"),  # 1
-    ("08:40", "09:15"),  # 2
-    ("09:20", "09:55"),  # 3
-    ("10:00", "10:35"),  # 4
-    ("10:40", "11:15"),  # 5
-    ("11:30", "12:05"),  # 6
-    ("12:10", "12:45"),  # 7
-    ("12:50", "13:25"),  # 8
-    ("13:30", "14:05"),  # 9
-    ("14:10", "14:45"),  # 10
-    ("14:50", "15:25"),  # 11
-]
+lesson_times = {
+1: ("08:00","08:35"),
+2: ("08:40","09:15"),
+3: ("09:20","09:55"),
+4: ("10:00","10:35"),
+5: ("10:40","11:15"),
+6: ("11:30","12:05"),
+7: ("12:10","12:45"),
+8: ("12:50","13:25"),
+9: ("13:30","14:05"),
+10: ("14:10","14:45"),
+11: ("14:50","15:25")
+}
 
 # ---------------- РОЗКЛАД ----------------
 schedule = {}
@@ -181,18 +181,24 @@ async def handler(message: types.Message):
         lessons_text = ""
     
         for lesson_number, lesson in lessons:
+
+    if lesson_number in lesson_times:
+
+        start, end = lesson_times[lesson_number]
+
+        lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
     
             if lesson_number <= len(lesson_times):
     
-                start, end = lesson_times[lesson_number - 1]
+                start, end = lesson_times[lesson_number]
     
                 lessons_text += f"{lesson_number}. {lesson} ({start}-{end})\n"
     
         first_num = lessons[0][0]
         last_num = lessons[-1][0]
     
-        first_start = lesson_times[first_num - 1][0]
-        last_end = lesson_times[last_num - 1][1]
+        first_start = lesson_times[first_num][0]
+        last_end = lesson_times[last_num][1]
     
         await message.answer(
             f"📚 Сьогодні до {last_num} уроку\n"
@@ -326,6 +332,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
