@@ -260,18 +260,51 @@ async def handler(message:types.Message):
     state=user_states.get(user_id)
 
 
-# ---------- БЛОКУВАННЯ БОТА БЕЗ ІМЕНІ ----------
+# ---------- РЕЄСТРАЦІЯ ----------
 
-    if user_id not in user_names and text!="/start":
-
-        user_states[user_id]="waiting_name"
-
+    if state == "waiting_name":
+    
+        name = text.strip()
+        parts = name.split()
+    
+        if len(parts) < 2:
+            await message.answer(
+                "🤨 Це не нік у TikTok.\n"
+                "Напишіть **прізвище та ім’я**."
+            )
+            return
+    
+        if not all(part.replace("-", "").isalpha() for part in parts):
+            await message.answer(
+                "😑 Тут мають бути **тільки літери**.\n"
+                "Без цифр і символів."
+            )
+            return
+    
+        user_names[user_id] = name
+        save_student(user_id, name)
+    
+        user_states[user_id] = "menu"
+    
         await message.answer(
-        "🚫 Стоп.\n"
-        "Це не TikTok і не анонімний чат 😄\n\n"
-        "Введіть своє прізвище та ім’я."
+            f"Записано: {name} ✅\nТепер можна користуватись ботом.",
+            reply_markup=main_kb
         )
-
+    
+        return
+    
+        # ---------- БЛОКУВАННЯ БЕЗ ІМЕНІ ----------
+    
+    if user_id not in user_names and text != "/start":
+    
+        user_states[user_id] = "waiting_name"
+    
+        await message.answer(
+            "🚫 Стоп.\n"
+            "Це не TikTok і не анонімний чат 😄\n\n"
+            "Введіть своє прізвище та ім’я."
+        )
+    
         return
 
 
@@ -473,3 +506,4 @@ async def main():
 if __name__=="__main__":
 
     asyncio.run(main())
+
