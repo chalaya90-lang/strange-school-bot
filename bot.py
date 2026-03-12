@@ -293,21 +293,6 @@ async def handler(message:types.Message):
     
         return
     
-        # ---------- БЛОКУВАННЯ БЕЗ ІМЕНІ ----------
-    
-    if user_id not in user_names and text != "/start":
-    
-        user_states[user_id] = "waiting_name"
-    
-        await message.answer(
-            "🚫 Стоп.\n"
-            "Це не TikTok і не анонімний чат 😄\n\n"
-            "Введіть своє прізвище та ім’я."
-        )
-    
-        return
-
-
 # ---------- START ----------
 
     if text=="/start":
@@ -506,4 +491,5 @@ async def main():
 if __name__=="__main__":
 
     asyncio.run(main())
+
 
