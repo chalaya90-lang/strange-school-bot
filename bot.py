@@ -233,7 +233,7 @@ async def morning_alarm():
                     try:
                         await bot.send_audio(
                         user,
-                        audio=FSInputFile("alarm.mp3"),
+                        FSInputFile("alarm.mp3.mp3")
                         caption=text
                         )
                     except:
