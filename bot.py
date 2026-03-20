@@ -406,6 +406,8 @@ async def main():
     load_data()
     load_students()
 
+    await bot.delete_webhook(drop_pending_updates=True)
+    
     asyncio.create_task(alarm())
 
     await dp.start_polling(bot)
