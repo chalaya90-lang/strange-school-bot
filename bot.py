@@ -185,9 +185,12 @@ async def alarm():
         await asyncio.sleep(20)
 
 # ================= HANDLER =================
+from aiogram import Router
 
-@dp.message()
-async def handler(msg: types.Message):
+router = Router()
+from aiogram import Router
+
+router = Router()
 
     global class_bank
 
