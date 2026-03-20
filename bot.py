@@ -1,6 +1,7 @@
 import asyncio
 import os
 import json
+import random
 import re
 
 from datetime import datetime
@@ -12,484 +13,372 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, FSInputFile
 import gspread
 from google.oauth2.service_account import Credentials
 
-
-# ---------- ЧАСОВИЙ ПОЯС ----------
-
 kyiv = pytz.timezone("Europe/Kyiv")
-
-
-# ---------- НАЛАШТУВАННЯ ----------
 
 TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
 
-ADMIN_NAMES = {"Марія Чала", "Лілія Шрам"}
+ADMIN_NAMES = {"Марія Чала", "Лілія Шрам", "Чала Любов"}
 
+# ================= ДАНІ =================
 
-# ---------- ДЗВІНКИ ----------
+coins = {}
+class_bank = 0
 
-lesson_times = [
-("08:00","08:35"),
-("08:40","09:15"),
-("09:20","09:55"),
-("10:00","10:35"),
-("10:40","11:15"),
-("11:30","12:05"),
-("12:10","12:45"),
-("12:50","13:25"),
-("13:30","14:05"),
-("14:10","14:45"),
-("14:50","15:25")
-]
+active_modes = []
+last_mode_date = None
 
+wake_users = set()
+user_states = {}
+user_names = {}
+users = set()
 
-# ---------- GOOGLE SHEETS ----------
+# ================= ЗБЕРЕЖЕННЯ =================
+
+def save_data():
+    with open("data.json", "w") as f:
+        json.dump({
+            "coins": coins,
+            "bank": class_bank,
+            "modes": active_modes,
+            "date": str(last_mode_date)
+        }, f)
+
+def load_data():
+    global coins, class_bank, active_modes
+
+    try:
+        with open("data.json") as f:
+            data = json.load(f)
+            coins = data.get("coins", {})
+            class_bank = data.get("bank", 0)
+            active_modes = data.get("modes", [])
+    except:
+        pass
+
+# ================= GOOGLE =================
 
 SCOPES = [
-"https://www.googleapis.com/auth/spreadsheets",
-"https://www.googleapis.com/auth/drive"
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
 ]
 
-creds_info = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-
-creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+creds = Credentials.from_service_account_info(
+    json.loads(os.getenv("GOOGLE_CREDENTIALS")),
+    scopes=SCOPES
+)
 
 gc = gspread.authorize(creds)
 
 sheet = gc.open("Відсутність учнів").sheet1
 schedule_sheet = gc.open("Відсутність учнів").worksheet("Розклад")
+ideas_sheet = gc.open("Відсутність учнів").worksheet("Ідеї")
 
-
-# ---------- BOT ----------
+# ================= BOT =================
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-users=set()
-user_names={}
-user_states={}
-usage_stats={}
-
-schedule_cache=[]
-
-
-# ---------- КЛАВІАТУРА ----------
+# ================= КНОПКИ =================
 
 main_kb = ReplyKeyboardMarkup(
 keyboard=[
 [KeyboardButton(text="📅 Розклад")],
 [KeyboardButton(text="⏰ Який урок зараз?")],
 [KeyboardButton(text="🔔 Дзвінки")],
-[KeyboardButton(text="📩 Повідомити про відсутність")],
-[KeyboardButton(text="📢 Оголошення")],
-[KeyboardButton(text="📊 Статистика")],
-[KeyboardButton(text="🏆 Рейтинг активності")]
+[KeyboardButton(text="💡 Ідеї для класу")],
+[KeyboardButton(text="😂 Мем дня"), KeyboardButton(text="🎯 Челендж дня")],
+[KeyboardButton(text="💌 Написати добро"), KeyboardButton(text="🎰 Удача")],
+[KeyboardButton(text="😴 Я прокинувся"), KeyboardButton(text="🪙 Мої монетки")],
+[KeyboardButton(text="🏦 Банк класу"), KeyboardButton(text="🎁 Магазин")],
+[KeyboardButton(text="🏆 Рейтинг"), KeyboardButton(text="⚖️ Дія вчителя")]
 ],
 resize_keyboard=True
 )
 
-back_kb = ReplyKeyboardMarkup(
-keyboard=[[KeyboardButton(text="⬅ Назад")]],
-resize_keyboard=True
-)
+# ================= МОНЕТКИ =================
 
+def add_coins(uid, amount):
+    coins[str(uid)] = coins.get(str(uid), 0) + amount
+    save_data()
 
-# ---------- СТАТИСТИКА ----------
+def remove_coins(uid, amount):
+    coins[str(uid)] = max(0, coins.get(str(uid), 0) - amount)
+    save_data()
 
-def update_usage(user_id,action):
+# ================= РЕЖИМИ =================
 
-    if user_id not in usage_stats:
-        usage_stats[user_id]={"schedule":0,"current":0}
+game_modes = ["мем","челендж","добро","лотерея"]
 
-    usage_stats[user_id][action]+=1
+def generate_modes():
+    global active_modes, last_mode_date
 
+    today = datetime.now(kyiv).date()
 
-# ---------- ФАЙЛИ ----------
+    if str(today) == str(last_mode_date):
+        return
 
-def load_students():
+    active_modes = random.sample(game_modes, 2)
+    last_mode_date = today
+    save_data()
 
-    try:
-        with open("students.txt","r",encoding="utf-8") as f:
+def is_active(mode):
+    return mode in active_modes
 
-            for line in f:
-                uid,name=line.strip().split("|")
-                user_names[int(uid)]=name
+# ================= БУДИЛЬНИК =================
 
-    except:
-        pass
-
-
-def save_student(user_id,name):
-
-    with open("students.txt","a",encoding="utf-8") as f:
-        f.write(f"{user_id}|{name}\n")
-
-
-def save_absence(name,reason):
-
-    now=datetime.now(kyiv).strftime("%d.%m.%Y %H:%M")
-
-    with open("absences.txt","a",encoding="utf-8") as f:
-        f.write(f"{now} | {name} | {reason}\n")
-
-    sheet.append_row([now,name,reason])
-
-
-# ---------- КЕШ РОЗКЛАДУ ----------
-
-def load_schedule():
-
-    global schedule_cache
-
-    rows=schedule_sheet.get_all_records()
-
-    schedule_cache=rows
-
-
-async def schedule_updater():
+async def alarm():
+    last_day = None
 
     while True:
 
-        load_schedule()
+        now = datetime.now(kyiv)
 
-        await asyncio.sleep(600)
+        if now.hour == 7 and 45 <= now.minute <= 46 and last_day != now.date():
 
+            generate_modes()
 
-# ---------- РОЗКЛАД СЬОГОДНІ ----------
+            text = "☀️ Доброго ранку\n\n"
 
-def get_today_schedule():
+            for r in schedule_sheet.get_all_records():
+                if int(r["День"]) == now.weekday():
+                    text += f"{r['Предмет']} ({r['Початок']}-{r['Кінець']})\n"
 
-    today=datetime.now(kyiv).weekday()
+            text += "\n🎮 Сьогодні активні:\n"
 
-    lessons=[]
+            names = {
+                "мем":"😂 Мем дня",
+                "челендж":"🎯 Челендж",
+                "добро":"💌 Добро",
+                "лотерея":"🎰 Лотерея"
+            }
 
-    for row in schedule_cache:
+            for m in active_modes:
+                text += f"• {names[m]}\n"
 
-        try:
-            day=int(row["День"])
-        except:
-            continue
-
-        if day==today:
-            lessons.append(row)
-
-    lessons.sort(key=lambda x:x["Початок"])
-
-    return lessons
-
-
-# ---------- УРОК ЗАРАЗ ----------
-
-def get_current_lesson():
-
-    lessons=get_today_schedule()
-
-    now=datetime.now(kyiv).time()
-
-    for row in lessons:
-
-        start=row["Початок"]
-        end=row["Кінець"]
-        subject=row["Предмет"]
-
-        start_t=datetime.strptime(start,"%H:%M").time()
-        end_t=datetime.strptime(end,"%H:%M").time()
-
-        if start_t<=now<=end_t:
-            return start,end,subject
-
-    return None
-
-
-# ---------- БУДИЛЬНИК ----------
-
-async def morning_alarm():
-
-    sent_today=False
-
-    while True:
-
-        now=datetime.now(kyiv)
-
-        if now.hour==7 and now.minute==45 and not sent_today:
-
-            lessons=get_today_schedule()
-
-            if lessons:
-
-                day_name=now.strftime("%A")
-
-                text=f"☀️ Доброго ранку\nСьогодні {day_name}\n\n📚 Розклад:\n\n"
-
-                for row in lessons:
-
-                    start=row["Початок"]
-                    end=row["Кінець"]
-                    subject=row["Предмет"]
-
-                    text+=f"{subject} ({start}-{end})\n"
-
-                for user in users:
-
-                    try:
-                        await bot.send_audio(
-                        user,
-                        FSInputFile("alarm.mp3.mp3")
+            for u in users:
+                try:
+                    await bot.send_voice(
+                        u,
+                        voice=FSInputFile("alarm.mp3.mp3"),
                         caption=text
-                        )
-                    except:
-                        pass
+                    )
+                except:
+                    pass
 
-            sent_today=True
+            last_day = now.date()
 
-        if now.hour==8:
-            sent_today=False
+        await asyncio.sleep(20)
 
-        await asyncio.sleep(30)
-
-
-# ---------- HANDLER ----------
+# ================= HANDLER =================
 
 @dp.message()
-async def handler(message:types.Message):
+async def handler(msg: types.Message):
 
-    text=message.text
-    user_id=message.chat.id
+    uid = msg.chat.id
+    text = msg.text
 
-    users.add(user_id)
+    users.add(uid)
 
-    state=user_states.get(user_id)
+    # базова монетка
+    add_coins(uid, 1)
 
-
-# ---------- РЕЄСТРАЦІЯ ----------
-
-    if state == "waiting_name":
-    
-        name = text.strip()
-        parts = name.split()
-    
-        if len(parts) < 2:
-            await message.answer(
-                "🤨 Це не нік у TikTok.\n"
-                "Напишіть **прізвище та ім’я**."
-            )
-            return
-    
-        if not all(part.replace("-", "").isalpha() for part in parts):
-            await message.answer(
-                "😑 Тут мають бути **тільки літери**.\n"
-                "Без цифр і символів."
-            )
-            return
-    
-        user_names[user_id] = name
-        save_student(user_id, name)
-    
-        user_states[user_id] = "menu"
-    
-        await message.answer(
-            f"Записано: {name} ✅\nТепер можна користуватись ботом.",
-            reply_markup=main_kb
-        )
-    
-        return
-    
-# ---------- START ----------
-
-    if text=="/start":
-
-        if user_id not in user_names:
-
-            user_states[user_id]="waiting_name"
-
-            await message.answer(
-            "Привіт 👋\n"
-            "Перед тим як користуватись ботом,\n"
-            "введіть своє прізвище та ім’я ✍️"
-            )
-
-            return
-
-        await message.answer("Головне меню 📚",reply_markup=main_kb)
-
+    # ===== ІДЕЇ =====
+    if text == "💡 Ідеї для класу":
+        user_states[uid] = "idea"
+        await msg.answer("Напиши ідею")
         return
 
-
-# ---------- РЕЄСТРАЦІЯ ----------
-
-    if state=="waiting_name":
-
-        name=text.strip()
-
-        parts=name.split()
-
-        if len(parts)<2:
-
-            await message.answer(
-            "🤨 Це не нік у TikTok.\n"
-            "Напишіть **прізвище та ім’я**."
-            )
-
-            return
-
-        if not all(re.match("^[А-Яа-яA-Za-zІіЇїЄє'-]+$",p) for p in parts):
-
-            await message.answer(
-            "😑 Тут мають бути **тільки літери**.\n"
-            "Без цифр і символів."
-            )
-
-            return
-
-        user_names[user_id]=name
-
-        save_student(user_id,name)
-
-        await message.answer(
-        f"Записано: {name} ✅\n"
-        "Тепер можна користуватись ботом.",
-        reply_markup=main_kb
-        )
-
+    if user_states.get(uid) == "idea":
+        ideas_sheet.append_row([
+            datetime.now(kyiv).strftime("%d.%m %H:%M"),
+            user_names.get(uid,"???"),
+            text
+        ])
+        add_coins(uid, 5)
+        await msg.answer("🔥 +5 монеток")
         return
 
+    # ===== МЕМ =====
+    if text == "😂 Мем дня":
 
-# ---------- РОЗКЛАД ----------
-
-    if text=="📅 Розклад":
-
-        lessons=get_today_schedule()
-
-        if not lessons:
-            await message.answer("Сьогодні уроків немає 😎")
+        if not is_active("мем"):
+            await msg.answer("Сьогодні без мемів")
             return
 
-        result="📚 Сьогодні:\n\n"
-
-        for row in lessons:
-
-            start=row["Початок"]
-            end=row["Кінець"]
-            subject=row["Предмет"]
-
-            lesson_number=None
-
-            for i,(s,e) in enumerate(lesson_times,start=1):
-
-                if s==start:
-                    lesson_number=i
-                    break
-
-            result+=f"{lesson_number}. {subject} ({start}-{end})\n"
-
-        await message.answer(result)
-
+        user_states[uid] = "meme"
+        await msg.answer("Скинь мем")
         return
 
+    if user_states.get(uid) == "meme":
+        add_coins(uid, 5)
+        await msg.answer("😂 +5")
+        return
 
-# ---------- ЯКИЙ УРОК ----------
+    # ===== ДОБРО =====
+    if text == "💌 Написати добро":
 
-    if text=="⏰ Який урок зараз":
+        if not is_active("добро"):
+            await msg.answer("Сьогодні без добра")
+            return
 
-        lesson=get_current_lesson()
+        user_states[uid] = "good"
+        await msg.answer("Напиши повідомлення")
+        return
 
-        if lesson:
+    if user_states.get(uid) == "good":
 
-            start,end,subject=lesson
+        target = random.choice(list(user_names.keys()))
 
-            await message.answer(
-            f"📖 Зараз урок\n{subject}\n{start}-{end}"
-            )
+        await bot.send_message(target, f"💌 Хтось написав:\n{text}")
 
+        add_coins(uid, 3)
+        await msg.answer("+3 🪙")
+        return
+
+    # ===== ЛОТЕРЕЯ =====
+    if text == "🎰 Удача":
+
+        if not is_active("лотерея"):
+            await msg.answer("Сьогодні не граємо")
+            return
+
+        reward = random.choice([0,0,5,10])
+        add_coins(uid, reward)
+
+        await msg.answer(f"{reward} 🪙")
+        return
+
+    # ===== ПРОКИНУВСЯ =====
+    if text == "😴 Я прокинувся":
+
+        if uid not in wake_users:
+            wake_users.add(uid)
+            add_coins(uid, 3)
+            await msg.answer("☀️ +3")
         else:
-
-            await message.answer("⏳ Зараз перерва")
-
+            await msg.answer("Вже прокинувся 😄")
         return
 
-
-# ---------- ДЗВІНКИ ----------
-
-    if text=="🔔 Дзвінки":
-
-        result="🔔 Розклад дзвінків:\n\n"
-
-        for i,(start,end) in enumerate(lesson_times,start=1):
-            result+=f"{i}. {start}-{end}\n"
-
-        await message.answer(result)
-
+    # ===== МОНЕТКИ =====
+    if text == "🪙 Мої монетки":
+        await msg.answer(f"{coins.get(str(uid),0)} 🪙")
         return
 
-
-# ---------- ВІДСУТНІСТЬ ----------
-
-    if text=="📩 Повідомити про відсутність":
-
-        user_states[user_id]="waiting_absence"
-
-        await message.answer("Напишіть причину ✍️",reply_markup=back_kb)
-
+    if text == "🏦 Банк класу":
+        await msg.answer(f"{class_bank} 🪙")
         return
 
+    # ===== РЕЙТИНГ =====
+    if text == "🏆 Рейтинг":
 
-    if state=="waiting_absence":
+        r = sorted(coins.items(), key=lambda x: x[1], reverse=True)
 
-        name=user_names.get(user_id,"Невідомий")
+        txt = "🏆 ТОП\n"
 
-        save_absence(name,text)
+        for i,(u,c) in enumerate(r[:5],1):
+            name = user_names.get(int(u),"???")
+            txt += f"{i}. {name} — {c}\n"
 
-        await message.answer("Запис додано ✅",reply_markup=main_kb)
-
+        await msg.answer(txt)
         return
 
+    # ===== ШТРАФИ =====
+    if text == "⚖️ Дія вчителя":
 
-# ---------- ОГОЛОШЕННЯ ----------
-
-    if text=="📢 Оголошення":
-
-        name=user_names.get(user_id)
-
-        if name not in ADMIN_NAMES:
-            await message.answer("Доступ тільки для адміністрації 🔒")
+        if user_names.get(uid) not in ADMIN_NAMES:
+            await msg.answer("Тільки для вчителя")
             return
 
-        user_states[user_id]="waiting_announcement"
+        user_states[uid] = "teacher"
 
-        await message.answer("Напишіть оголошення")
-
+        await msg.answer(
+            "1 Мінус учню\n"
+            "2 Мінус класу\n"
+            "3 Штраф-жарт\n"
+            "4 Допомога\n"
+            "5 Амністія"
+        )
         return
 
+    if user_states.get(uid) == "teacher":
 
-    if state=="waiting_announcement":
+        if text == "1":
+            user_states[uid] = "penalty_user"
+            await msg.answer("Введи ПІБ")
+            return
 
-        for u in users:
+        if text == "2":
+            global class_bank
+            class_bank = max(0, class_bank - 5)
+            save_data()
+            await msg.answer("🧨 -5 класу")
+            return
 
-            try:
-                await bot.send_message(u,f"📢 ОГОЛОШЕННЯ\n\n{text}")
-            except:
-                pass
+        if text == "3":
+            await msg.answer("🤝 Скажи комплімент класу")
+            return
 
-        await message.answer("Оголошення розіслано")
+        if text == "4":
+            user_states[uid] = "reward_user"
+            await msg.answer("Хто допоміг?")
+            return
 
+        if text == "5":
+            for u in user_names.keys():
+                add_coins(u, 3)
+            await msg.answer("🧼 +3 всім")
+            return
+
+    if user_states.get(uid) == "penalty_user":
+
+        target = None
+
+        for u,n in user_names.items():
+            if n == text:
+                target = u
+
+        if not target:
+            await msg.answer("Не знайдено")
+            return
+
+        user_states[uid] = ("penalty_amount", target)
+
+        await msg.answer("Скільки? (1/3/5)")
         return
 
+    if isinstance(user_states.get(uid), tuple):
 
-# ---------- MAIN ----------
+        state, target = user_states[uid]
+
+        if state == "penalty_amount":
+
+            remove_coins(target, int(text))
+
+            await bot.send_message(
+                target,
+                f"⚠️ -{text} 🪙\nСьогодні не твій день 😄"
+            )
+
+            await msg.answer("Готово")
+            return
+
+    if user_states.get(uid) == "reward_user":
+
+        for u,n in user_names.items():
+            if n == text:
+                add_coins(u, 2)
+                await msg.answer("+2 🪙")
+                return
+
+# ================= MAIN =================
 
 async def main():
 
-    load_students()
+    load_data()
 
-    load_schedule()
-
-    asyncio.create_task(schedule_updater())
-    asyncio.create_task(morning_alarm())
+    asyncio.create_task(alarm())
 
     await dp.start_polling(bot)
 
-
-if __name__=="__main__":
-
+if __name__ == "__main__":
     asyncio.run(main())
-
-
