@@ -55,6 +55,21 @@ def load_data():
     except:
         pass
 
+# ================= СТУДЕНТИ =================
+
+def load_students():
+    try:
+        with open("students.txt", "r", encoding="utf-8") as f:
+            for line in f:
+                uid, name = line.strip().split("|")
+                user_names[int(uid)] = name
+    except:
+        pass
+
+def save_student(uid, name):
+    with open("students.txt", "a", encoding="utf-8") as f:
+        f.write(f"{uid}|{name}\n")
+
 # ================= GOOGLE =================
 
 SCOPES = [
@@ -173,9 +188,9 @@ async def alarm():
 
 @dp.message()
 async def handler(msg: types.Message):
-    
+
     global class_bank
-    
+
     uid = msg.chat.id
     text = msg.text
 
@@ -197,6 +212,7 @@ async def handler(msg: types.Message):
             text
         ])
         add_coins(uid, 5)
+        user_states.pop(uid, None)
         await msg.answer("🔥 +5 монеток")
         return
 
@@ -213,6 +229,7 @@ async def handler(msg: types.Message):
 
     if user_states.get(uid) == "meme":
         add_coins(uid, 5)
+        user_states.pop(uid, None)
         await msg.answer("😂 +5")
         return
 
@@ -221,6 +238,10 @@ async def handler(msg: types.Message):
 
         if not is_active("добро"):
             await msg.answer("Сьогодні без добра")
+            return
+
+        if not user_names:
+            await msg.answer("Немає користувачів")
             return
 
         user_states[uid] = "good"
@@ -234,6 +255,7 @@ async def handler(msg: types.Message):
         await bot.send_message(target, f"💌 Хтось написав:\n{text}")
 
         add_coins(uid, 3)
+        user_states.pop(uid, None)
         await msg.answer("+3 🪙")
         return
 
@@ -310,13 +332,8 @@ async def handler(msg: types.Message):
             return
 
         if text == "2":
-        
-            global class_bank
-            
             class_bank = max(0, class_bank - 5)
-            
             save_data()
-            
             await msg.answer("🧨 -5 класу")
             return
 
@@ -358,6 +375,10 @@ async def handler(msg: types.Message):
 
         if state == "penalty_amount":
 
+            if not text.isdigit():
+                await msg.answer("Введи число")
+                return
+
             remove_coins(target, int(text))
 
             await bot.send_message(
@@ -365,6 +386,7 @@ async def handler(msg: types.Message):
                 f"⚠️ -{text} 🪙\nСьогодні не твій день 😄"
             )
 
+            user_states.pop(uid, None)
             await msg.answer("Готово")
             return
 
@@ -373,6 +395,7 @@ async def handler(msg: types.Message):
         for u,n in user_names.items():
             if n == text:
                 add_coins(u, 2)
+                user_states.pop(uid, None)
                 await msg.answer("+2 🪙")
                 return
 
@@ -381,6 +404,7 @@ async def handler(msg: types.Message):
 async def main():
 
     load_data()
+    load_students()
 
     asyncio.create_task(alarm())
 
