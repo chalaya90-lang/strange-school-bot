@@ -308,9 +308,13 @@ async def handler(msg: types.Message):
             return
 
         if text == "2":
+        
             global class_bank
+            
             class_bank = max(0, class_bank - 5)
+            
             save_data()
+            
             await msg.answer("🧨 -5 класу")
             return
 
