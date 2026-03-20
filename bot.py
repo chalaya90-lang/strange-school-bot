@@ -2,12 +2,11 @@ import asyncio
 import os
 import json
 import random
-import re
 
 from datetime import datetime
 import pytz
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, Router
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, FSInputFile
 
 import gspread
@@ -45,7 +44,6 @@ def save_data():
 
 def load_data():
     global coins, class_bank, active_modes
-
     try:
         with open("data.json") as f:
             data = json.load(f)
@@ -66,10 +64,6 @@ def load_students():
     except:
         pass
 
-def save_student(uid, name):
-    with open("students.txt", "a", encoding="utf-8") as f:
-        f.write(f"{uid}|{name}\n")
-
 # ================= GOOGLE =================
 
 SCOPES = [
@@ -84,7 +78,6 @@ creds = Credentials.from_service_account_info(
 
 gc = gspread.authorize(creds)
 
-sheet = gc.open("Відсутність учнів").sheet1
 schedule_sheet = gc.open("Відсутність учнів").worksheet("Розклад")
 ideas_sheet = gc.open("Відсутність учнів").worksheet("Ідеї")
 
@@ -92,22 +85,20 @@ ideas_sheet = gc.open("Відсутність учнів").worksheet("Ідеї")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+router = Router()
 
 # ================= КНОПКИ =================
 
 main_kb = ReplyKeyboardMarkup(
-keyboard=[
-[KeyboardButton(text="📅 Розклад")],
-[KeyboardButton(text="⏰ Який урок зараз?")],
-[KeyboardButton(text="🔔 Дзвінки")],
-[KeyboardButton(text="💡 Ідеї для класу")],
-[KeyboardButton(text="😂 Мем дня"), KeyboardButton(text="🎯 Челендж дня")],
-[KeyboardButton(text="💌 Написати добро"), KeyboardButton(text="🎰 Удача")],
-[KeyboardButton(text="😴 Я прокинувся"), KeyboardButton(text="🪙 Мої монетки")],
-[KeyboardButton(text="🏦 Банк класу"), KeyboardButton(text="🎁 Магазин")],
-[KeyboardButton(text="🏆 Рейтинг"), KeyboardButton(text="⚖️ Дія вчителя")]
-],
-resize_keyboard=True
+    keyboard=[
+        [KeyboardButton(text="💡 Ідеї для класу")],
+        [KeyboardButton(text="😂 Мем дня"), KeyboardButton(text="🎯 Челендж дня")],
+        [KeyboardButton(text="💌 Написати добро"), KeyboardButton(text="🎰 Удача")],
+        [KeyboardButton(text="😴 Я прокинувся")],
+        [KeyboardButton(text="🪙 Мої монетки"), KeyboardButton(text="🏦 Банк класу")],
+        [KeyboardButton(text="🏆 Рейтинг"), KeyboardButton(text="⚖️ Дія вчителя")]
+    ],
+    resize_keyboard=True
 )
 
 # ================= МОНЕТКИ =================
@@ -139,58 +130,10 @@ def generate_modes():
 def is_active(mode):
     return mode in active_modes
 
-# ================= БУДИЛЬНИК =================
-
-async def alarm():
-    last_day = None
-
-    while True:
-
-        now = datetime.now(kyiv)
-
-        if now.hour == 7 and 45 <= now.minute <= 46 and last_day != now.date():
-
-            generate_modes()
-
-            text = "☀️ Доброго ранку\n\n"
-
-            for r in schedule_sheet.get_all_records():
-                if int(r["День"]) == now.weekday():
-                    text += f"{r['Предмет']} ({r['Початок']}-{r['Кінець']})\n"
-
-            text += "\n🎮 Сьогодні активні:\n"
-
-            names = {
-                "мем":"😂 Мем дня",
-                "челендж":"🎯 Челендж",
-                "добро":"💌 Добро",
-                "лотерея":"🎰 Лотерея"
-            }
-
-            for m in active_modes:
-                text += f"• {names[m]}\n"
-
-            for u in users:
-                try:
-                    await bot.send_voice(
-                        u,
-                        voice=FSInputFile("alarm.mp3.mp3"),
-                        caption=text
-                    )
-                except:
-                    pass
-
-            last_day = now.date()
-
-        await asyncio.sleep(20)
-
 # ================= HANDLER =================
-from aiogram import Router
 
-router = Router()
-from aiogram import Router
-
-router = Router()
+@router.message()
+async def handler(msg: types.Message):
 
     global class_bank
 
@@ -198,8 +141,6 @@ router = Router()
     text = msg.text
 
     users.add(uid)
-
-    # базова монетка
     add_coins(uid, 1)
 
     # ===== ІДЕЇ =====
@@ -221,7 +162,6 @@ router = Router()
 
     # ===== МЕМ =====
     if text == "😂 Мем дня":
-
         if not is_active("мем"):
             await msg.answer("Сьогодні без мемів")
             return
@@ -238,7 +178,6 @@ router = Router()
 
     # ===== ДОБРО =====
     if text == "💌 Написати добро":
-
         if not is_active("добро"):
             await msg.answer("Сьогодні без добра")
             return
@@ -252,11 +191,8 @@ router = Router()
         return
 
     if user_states.get(uid) == "good":
-
         target = random.choice(list(user_names.keys()))
-
         await bot.send_message(target, f"💌 Хтось написав:\n{text}")
-
         add_coins(uid, 3)
         user_states.pop(uid, None)
         await msg.answer("+3 🪙")
@@ -264,20 +200,17 @@ router = Router()
 
     # ===== ЛОТЕРЕЯ =====
     if text == "🎰 Удача":
-
         if not is_active("лотерея"):
             await msg.answer("Сьогодні не граємо")
             return
 
         reward = random.choice([0,0,5,10])
         add_coins(uid, reward)
-
         await msg.answer(f"{reward} 🪙")
         return
 
     # ===== ПРОКИНУВСЯ =====
     if text == "😴 Я прокинувся":
-
         if uid not in wake_users:
             wake_users.add(uid)
             add_coins(uid, 3)
@@ -297,15 +230,11 @@ router = Router()
 
     # ===== РЕЙТИНГ =====
     if text == "🏆 Рейтинг":
-
         r = sorted(coins.items(), key=lambda x: x[1], reverse=True)
-
         txt = "🏆 ТОП\n"
-
         for i,(u,c) in enumerate(r[:5],1):
             name = user_names.get(int(u),"???")
             txt += f"{i}. {name} — {c}\n"
-
         await msg.answer(txt)
         return
 
@@ -355,53 +284,6 @@ router = Router()
             await msg.answer("🧼 +3 всім")
             return
 
-    if user_states.get(uid) == "penalty_user":
-
-        target = None
-
-        for u,n in user_names.items():
-            if n == text:
-                target = u
-
-        if not target:
-            await msg.answer("Не знайдено")
-            return
-
-        user_states[uid] = ("penalty_amount", target)
-
-        await msg.answer("Скільки? (1/3/5)")
-        return
-
-    if isinstance(user_states.get(uid), tuple):
-
-        state, target = user_states[uid]
-
-        if state == "penalty_amount":
-
-            if not text.isdigit():
-                await msg.answer("Введи число")
-                return
-
-            remove_coins(target, int(text))
-
-            await bot.send_message(
-                target,
-                f"⚠️ -{text} 🪙\nСьогодні не твій день 😄"
-            )
-
-            user_states.pop(uid, None)
-            await msg.answer("Готово")
-            return
-
-    if user_states.get(uid) == "reward_user":
-
-        for u,n in user_names.items():
-            if n == text:
-                add_coins(u, 2)
-                user_states.pop(uid, None)
-                await msg.answer("+2 🪙")
-                return
-
 # ================= MAIN =================
 
 async def main():
@@ -411,9 +293,7 @@ async def main():
 
     await bot.delete_webhook(drop_pending_updates=True)
 
-    dp.include_router(router)  # 👈 ВАЖЛИВО
-
-    asyncio.create_task(alarm())
+    dp.include_router(router)
 
     await dp.start_polling(bot)
 
