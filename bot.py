@@ -173,7 +173,9 @@ async def alarm():
 
 @dp.message()
 async def handler(msg: types.Message):
-
+    
+    global class_bank
+    
     uid = msg.chat.id
     text = msg.text
 
