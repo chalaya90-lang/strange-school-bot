@@ -18,7 +18,7 @@ kyiv = pytz.timezone("Europe/Kyiv")
 TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
 
 ADMIN_NAMES = {"Марія Чала", "Лілія Шрам", "Чала Любов"}
-await bot.delete_webhook(drop_pending_updates=True)
+print("БОТ ЗАПУСТИВСЯ 🚀")
 
 # ================= ДАНІ =================
 
