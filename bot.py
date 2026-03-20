@@ -18,8 +18,6 @@ kyiv = pytz.timezone("Europe/Kyiv")
 TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
 
 ADMIN_NAMES = {"Марія Чала", "Лілія Шрам", "Чала Любов"}
-print("БОТ ЗАПУСТИВСЯ 🚀")
-print("ПРИЙШЛО:", msg.text)
 
 # ================= ДАНІ =================
 
@@ -409,7 +407,9 @@ async def main():
     load_students()
 
     await bot.delete_webhook(drop_pending_updates=True)
-    
+
+    dp.include_router(router)  # 👈 ВАЖЛИВО
+
     asyncio.create_task(alarm())
 
     await dp.start_polling(bot)
