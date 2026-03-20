@@ -19,6 +19,7 @@ TOKEN = "8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE"
 
 ADMIN_NAMES = {"Марія Чала", "Лілія Шрам", "Чала Любов"}
 print("БОТ ЗАПУСТИВСЯ 🚀")
+print("ПРИЙШЛО:", msg.text)
 
 # ================= ДАНІ =================
 
