@@ -7,7 +7,7 @@ from datetime import datetime
 import pytz
 
 from aiogram import Bot, Dispatcher, types, Router
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, FSInputFile
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -22,14 +22,14 @@ ADMIN_NAMES = {"Марія Чала", "Лілія Шрам", "Чала Любо�
 
 coins = {}
 class_bank = 0
+user_states = {}
+user_names = {}
+users = set()
 
 active_modes = []
 last_mode_date = None
 
 wake_users = set()
-user_states = {}
-user_names = {}
-users = set()
 
 # ================= ЗБЕРЕЖЕННЯ =================
 
@@ -37,44 +37,31 @@ def save_data():
     with open("data.json", "w") as f:
         json.dump({
             "coins": coins,
-            "bank": class_bank,
-            "modes": active_modes,
-            "date": str(last_mode_date)
+            "bank": class_bank
         }, f)
 
 def load_data():
-    global coins, class_bank, active_modes
+    global coins, class_bank
     try:
         with open("data.json") as f:
             data = json.load(f)
             coins = data.get("coins", {})
             class_bank = data.get("bank", 0)
-            active_modes = data.get("modes", [])
-    except:
-        pass
-
-# ================= СТУДЕНТИ =================
-
-def load_students():
-    try:
-        with open("students.txt", "r", encoding="utf-8") as f:
-            for line in f:
-                uid, name = line.strip().split("|")
-                user_names[int(uid)] = name
     except:
         pass
 
 # ================= GOOGLE =================
-print("ENV:", os.getenv("GOOGLE_CREDENTIALS"))
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+
+schedule_sheet = None
+ideas_sheet = None
 
 try:
     creds = Credentials.from_service_account_info(
         json.loads(os.getenv("GOOGLE_CREDENTIALS")),
-        scopes=SCOPES
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
     )
 
     gc = gspread.authorize(creds)
@@ -86,6 +73,7 @@ try:
 
 except Exception as e:
     print("GOOGLE ERROR ❌", e)
+
 # ================= BOT =================
 
 bot = Bot(token=TOKEN)
@@ -130,7 +118,6 @@ def generate_modes():
 
     active_modes = random.sample(game_modes, 2)
     last_mode_date = today
-    save_data()
 
 def is_active(mode):
     return mode in active_modes
@@ -143,9 +130,20 @@ async def handler(msg: types.Message):
     global class_bank
 
     uid = msg.chat.id
-    text = msg.text
+    text = msg.text or ""
 
     users.add(uid)
+    user_names[uid] = user_names.get(uid, f"User_{uid}")
+
+    # 🔥 START
+    if text == "/start":
+        await msg.answer(
+            "Я живий 😎\nОбирай кнопку👇",
+            reply_markup=main_kb
+        )
+        return
+
+    # базова монетка
     add_coins(uid, 1)
 
     # ===== ІДЕЇ =====
@@ -155,18 +153,23 @@ async def handler(msg: types.Message):
         return
 
     if user_states.get(uid) == "idea":
-        ideas_sheet.append_row([
-            datetime.now(kyiv).strftime("%d.%m %H:%M"),
-            user_names.get(uid,"???"),
-            text
-        ])
+
+        if ideas_sheet:
+            ideas_sheet.append_row([
+                datetime.now(kyiv).strftime("%d.%m %H:%M"),
+                user_names.get(uid,"???"),
+                text
+            ])
+
         add_coins(uid, 5)
         user_states.pop(uid, None)
+
         await msg.answer("🔥 +5 монеток")
         return
 
     # ===== МЕМ =====
     if text == "😂 Мем дня":
+
         if not is_active("мем"):
             await msg.answer("Сьогодні без мемів")
             return
@@ -183,6 +186,7 @@ async def handler(msg: types.Message):
 
     # ===== ДОБРО =====
     if text == "💌 Написати добро":
+
         if not is_active("добро"):
             await msg.answer("Сьогодні без добра")
             return
@@ -196,26 +200,33 @@ async def handler(msg: types.Message):
         return
 
     if user_states.get(uid) == "good":
+
         target = random.choice(list(user_names.keys()))
+
         await bot.send_message(target, f"💌 Хтось написав:\n{text}")
+
         add_coins(uid, 3)
         user_states.pop(uid, None)
+
         await msg.answer("+3 🪙")
         return
 
     # ===== ЛОТЕРЕЯ =====
     if text == "🎰 Удача":
+
         if not is_active("лотерея"):
             await msg.answer("Сьогодні не граємо")
             return
 
         reward = random.choice([0,0,5,10])
         add_coins(uid, reward)
+
         await msg.answer(f"{reward} 🪙")
         return
 
     # ===== ПРОКИНУВСЯ =====
     if text == "😴 Я прокинувся":
+
         if uid not in wake_users:
             wake_users.add(uid)
             add_coins(uid, 3)
@@ -235,11 +246,15 @@ async def handler(msg: types.Message):
 
     # ===== РЕЙТИНГ =====
     if text == "🏆 Рейтинг":
+
         r = sorted(coins.items(), key=lambda x: x[1], reverse=True)
+
         txt = "🏆 ТОП\n"
+
         for i,(u,c) in enumerate(r[:5],1):
             name = user_names.get(int(u),"???")
             txt += f"{i}. {name} — {c}\n"
+
         await msg.answer(txt)
         return
 
@@ -261,40 +276,11 @@ async def handler(msg: types.Message):
         )
         return
 
-    if user_states.get(uid) == "teacher":
-
-        if text == "1":
-            user_states[uid] = "penalty_user"
-            await msg.answer("Введи ПІБ")
-            return
-
-        if text == "2":
-            class_bank = max(0, class_bank - 5)
-            save_data()
-            await msg.answer("🧨 -5 класу")
-            return
-
-        if text == "3":
-            await msg.answer("🤝 Скажи комплімент класу")
-            return
-
-        if text == "4":
-            user_states[uid] = "reward_user"
-            await msg.answer("Хто допоміг?")
-            return
-
-        if text == "5":
-            for u in user_names.keys():
-                add_coins(u, 3)
-            await msg.answer("🧼 +3 всім")
-            return
-
 # ================= MAIN =================
 
 async def main():
 
     load_data()
-    load_students()
 
     await bot.delete_webhook(drop_pending_updates=True)
 
