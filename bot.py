@@ -65,22 +65,27 @@ def load_students():
         pass
 
 # ================= GOOGLE =================
-
+print("ENV:", os.getenv("GOOGLE_CREDENTIALS"))
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = Credentials.from_service_account_info(
-    json.loads(os.getenv("GOOGLE_CREDENTIALS")),
-    scopes=SCOPES
-)
+try:
+    creds = Credentials.from_service_account_info(
+        json.loads(os.getenv("GOOGLE_CREDENTIALS")),
+        scopes=SCOPES
+    )
 
-gc = gspread.authorize(creds)
+    gc = gspread.authorize(creds)
 
-schedule_sheet = gc.open("Відсутність учнів").worksheet("Розклад")
-ideas_sheet = gc.open("Відсутність учнів").worksheet("Ідеї")
+    schedule_sheet = gc.open("Відсутність учнів").worksheet("Розклад")
+    ideas_sheet = gc.open("Відсутність учнів").worksheet("Ідеї")
 
+    print("GOOGLE OK ✅")
+
+except Exception as e:
+    print("GOOGLE ERROR ❌", e)
 # ================= BOT =================
 
 bot = Bot(token=TOKEN)
