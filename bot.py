@@ -1075,17 +1075,17 @@ async def morning_digest():
     global gold_coin_log
     while True:
         now = datetime.now(kyiv)
-    if vacations_sheet:
-try:
-    vrows = vacations_sheet.get_all_records()
-    for vr in vrows:
-        start = datetime.strptime(str(vr["початок"]), "%d.%m.%Y").date()
-        end   = datetime.strptime(str(vr["кінець"]),  "%d.%m.%Y").date()
-        if start <= now.date() <= end:
-            await asyncio.sleep(3600)
-            continue
-except Exception:
-    pass
+        if vacations_sheet:
+            try:
+                vrows = vacations_sheet.get_all_records()
+                for vr in vrows:
+                    start = datetime.strptime(str(vr["початок"]), "%d.%m.%Y").date()
+                    end   = datetime.strptime(str(vr["кінець"]),  "%d.%m.%Y").date()
+                    if start <= now.date() <= end:
+                        await asyncio.sleep(3600)
+                        continue
+            except Exception:
+                pass
         target = now.replace(hour=7, minute=45, second=0, microsecond=0)
         if now >= target:
             target += timedelta(days=1)
