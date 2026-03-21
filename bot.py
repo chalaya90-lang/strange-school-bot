@@ -16,7 +16,7 @@ from google.oauth2.service_account import Credentials
 # ================= НАЛАШТУВАННЯ =================
 
 kyiv = pytz.timezone("Europe/Kyiv")
-TOKEN = os.getenv("8582009214:AAEwkSe7XPSvnt42rWQoJktYRmhQU3iwtfE")
+TOKEN = os.getenv("BOT_TOKEN", "ВАШ_ТОКЕН_ТУТ")
 
 # Адміни: реальне ім'я → нік в боті
 ADMIN_DISPLAY = {
