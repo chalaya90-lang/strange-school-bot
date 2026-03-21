@@ -219,7 +219,7 @@ def init_google():
     global absence_sheet, purchases_sheet, complaints_sheet, holidays_sheet, baskets_sheet
     try:
         creds = Credentials.from_service_account_info(
-            json.loads(os.getenv("GOOGLE_CREDENTIALS=")),
+            json.loads(os.getenv("GOOGLE_CREDENTIALS")),
             scopes=[
                 "https://www.googleapis.com/auth/spreadsheets",
                 "https://www.googleapis.com/auth/drive",
@@ -539,7 +539,22 @@ async def handler(msg: types.Message):
         register_user(uid, uname, name)
         user_states.pop(uid, None)
         display = ADMIN_DISPLAY.get(name, name)
-        await msg.answer(f"Чудово, {display}! 🎉\nТепер ти в грі 🪙", reply_markup=build_main_kb(uid))
+        welcome = (
+            f"Йоу, {display}! 🔥 Ти в грі!\n\n"
+            f"Це бот твого класу — тут можна заробляти монети і витрачати їх на круті штуки 😎\n\n"
+            f"Що тут є:\n"
+            f"🪙 Монети — за активність, ідеї, добрі вчинки\n"
+            f"🛒 Магазин — пропустити домашнє, кінодень, піца з іграми і ще багато\n"
+            f"🎰 Удача — крути барабан 2 рази на тиждень\n"
+            f"🤫 Таємний друг — анонімно роби приємне однокласнику\n"
+            f"💌 Написати добро — анонімне повідомлення комусь з класу\n"
+            f"🧺 Спільний збір — складайтесь разом на щось круте\n"
+            f"🌟 Золота монета — раз на місяць комусь везе на +50 🪙\n"
+            f"🎂 Іменинники — бот вітає весь клас!\n\n"
+            f"Рівні: 🌱 Новачок → ⭐️ Активіст → 🔥 Ентузіаст → 💎 Легенда → 👑 Суперзірка\n\n"
+            f"Чим активніший — тим вище рівень. Го! 🚀"
+        )
+        await msg.answer(welcome, reply_markup=build_main_kb(uid))
         return
 
     if not is_registered(uid):
