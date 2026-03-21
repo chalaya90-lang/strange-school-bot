@@ -27,7 +27,7 @@ ADMIN_DISPLAY = {
 ADMIN_NAMES = set(ADMIN_DISPLAY.keys())
 
 # Твій Telegram ID — отримаєш після /myid
-NOTIFY_ADMIN_ID = int(os.getenv("NOTIFY_ADMIN_ID", "0"))
+NOTIFY_ADMIN_ID = int(os.getenv("NOTIFY_ADMIN_ID", "1047959580"))
 
 # ================= ДЗВІНКИ =================
 
