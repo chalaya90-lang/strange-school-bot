@@ -559,6 +559,36 @@ async def cmd_bugfix(msg: types.Message):
 
     await msg.answer("✅ Повідомлення надіслано всім, монети нараховано!")
 
+@router.message(Command("award"))
+async def cmd_award(msg: types.Message):
+    """Використання: /award @username кількість причина"""
+    uid = str(msg.chat.id)
+    if not is_admin(uid):
+        return
+    parts = (msg.text or "").split(maxsplit=3)
+    if len(parts) < 4:
+        await msg.answer("Формат: /award @username кількість причина\nНаприклад: /award @Popka_MuravR 10 за найкреативніший нік 😂")
+        return
+    _, uname_t, amount_str, reason = parts
+    if not amount_str.isdigit():
+        await msg.answer("Кількість має бути числом")
+        return
+    target_uid = find_user_by_username(uname_t)
+    if not target_uid:
+        await msg.answer(f"Не знайшов {uname_t}")
+        return
+    amount = int(amount_str)
+    add_coins(target_uid, amount)
+    target_name = get_user_name(target_uid)
+    await msg.answer(f"✅ {target_name} +{amount} 🪙\nПричина: {reason}")
+    try:
+        await bot.send_message(
+            int(target_uid),
+            f"🏆 Спеціальна нагорода!\n\n+{amount} 🪙\nПричина: {reason}"
+        )
+    except Exception:
+        pass
+
 
     await msg.answer(f"Твій ID: `{msg.chat.id}`", parse_mode="Markdown")
 
