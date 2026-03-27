@@ -29,6 +29,44 @@ NOTIFY_ADMIN_ID = int(os.getenv("NOTIFY_ADMIN_ID", "0"))
 # Максимум монет на день
 DAILY_COIN_LIMIT = 15
 
+# ID товару місця — блокується на весь клас на тиждень
+SEAT_ITEM_ID = "seat"
+
+# ================= EMOJI ЗАГАДКИ =================
+
+EMOJI_RIDDLES = [
+    {"emoji": "🦁👑", "answer": "король лев", "hint": "мультфільм Disney"},
+    {"emoji": "🧊❄️👸", "answer": "крижане серце", "hint": "мультфільм про Ельзу"},
+    {"emoji": "🕷️👨", "answer": "людина павук", "hint": "супергерой Marvel"},
+    {"emoji": "🦸🦸‍♀️🦸‍♂️", "answer": "суперсімейка", "hint": "мультфільм Pixar"},
+    {"emoji": "🐟🐠🔵", "answer": "немо", "hint": "мультфільм про рибку"},
+    {"emoji": "🤖🚗", "answer": "трансформери", "hint": "роботи що перетворюються"},
+    {"emoji": "🧙‍♂️⚡️🏫", "answer": "гаррі поттер", "hint": "школа чарівників"},
+    {"emoji": "🦖🏝️", "answer": "парк юрського періоду", "hint": "динозаври на острові"},
+    {"emoji": "👸🐸", "answer": "принцеса і жаба", "hint": "мультфільм Disney"},
+    {"emoji": "🐻🍯", "answer": "вінні пух", "hint": "ведмедик любить мед"},
+    {"emoji": "🚀👨‍🚀🌕", "answer": "аполлон", "hint": "місія на Місяць"},
+    {"emoji": "🧸❤️🤖", "answer": "валл і", "hint": "робот у космосі"},
+    {"emoji": "🦊🐰🏙️", "answer": "зоотрополіс", "hint": "місто тварин"},
+    {"emoji": "🎪🐘🤡", "answer": "дамбо", "hint": "літаючий слоник"},
+    {"emoji": "🌊🏄‍♀️🌺", "answer": "моана", "hint": "дівчина і океан"},
+    {"emoji": "🐉🔥🧒", "answer": "як приручити дракона", "hint": "хлопець і дракон Беззубик"},
+    {"emoji": "🍕🗽🐢", "answer": "черепашки ніндзя", "hint": "герої в панцирі"},
+    {"emoji": "⚡️🏎️🏁", "answer": "блискавка маккуїн", "hint": "мультфільм Тачки"},
+    {"emoji": "🧊🏒🇨🇦", "answer": "льодова арена", "hint": "канадський спорт"},
+    {"emoji": "🦁🐯🐻", "answer": "книга джунглів", "hint": "Мауглі і тварини"},
+    {"emoji": "👦🎈🔴", "answer": "воно", "hint": "страшний клоун"},
+    {"emoji": "🦸‍♀️💪🌟", "answer": "диво жінка", "hint": "супергероїня DC"},
+    {"emoji": "🐼🥋🍜", "answer": "kung fu panda", "hint": "панда і кунг-фу"},
+    {"emoji": "🏰👸🐲", "answer": "відважна", "hint": "шотландська принцеса Мерида"},
+    {"emoji": "🤥👃🪵", "answer": "піноккіо", "hint": "дерев'яний хлопчик"},
+    {"emoji": "🌹👹", "answer": "красуня і чудовисько", "hint": "казка Disney"},
+    {"emoji": "🧞‍♂️🪔✨", "answer": "аладдін", "hint": "джин і три бажання"},
+    {"emoji": "🐠🦈🌊", "answer": "в пошуках немо", "hint": "тато шукає сина"},
+    {"emoji": "👣🌋🗺️", "answer": "загублений світ", "hint": "пригоди і динозаври"},
+    {"emoji": "🎭😂😢", "answer": "головоломка", "hint": "емоції всередині голови"},
+]
+
 # ================= ДЗВІНКИ =================
 
 BELLS = [
@@ -429,7 +467,7 @@ def build_main_kb(user_id: str) -> ReplyKeyboardMarkup:
     if row2: rows.append(row2)
 
     rows.append([KeyboardButton(text="😴 Я прокинувся")])
-    rows.append([KeyboardButton(text="🤫 Таємний друг")])
+    rows.append([KeyboardButton(text="🤫 Таємний друг"), KeyboardButton(text="🧩 Emoji-загадка")])
     rows.append([KeyboardButton(text="🛒 Магазин"), KeyboardButton(text="🧺 Спільні кошики")])
     rows.append([KeyboardButton(text="🪙 Мої монетки"), KeyboardButton(text="🏦 Банк класу")])
     rows.append([KeyboardButton(text="🏆 Рейтинг"), KeyboardButton(text="📬 Скарга")])
@@ -483,6 +521,12 @@ secret_friend_cycle: str = ""
 
 # Очікують підтвердження адміна: approval_id → {uid, action, text, coins, msg_id}
 pending_approvals: dict[str, dict] = {}
+
+# Активна emoji-загадка: uid → {riddle, attempts}
+emoji_game: dict[str, dict] = {}
+
+# Глобальне блокування місця: week_key → uid хто купив
+seat_lock: dict[str, str] = {}
 
 # Літери є в рос. але не в укр.
 RUSSIAN_ONLY = set("ёъыэЁЪЫЭ")
@@ -820,6 +864,11 @@ async def handler(msg: types.Message):
     # ===== СТАНИ =====
 
     if user_states.get(uid) == "idea":
+        # Мінімум 10 символів
+        if len(text.strip()) < 10:
+            await msg.answer("❌ Ідея занадто коротка! Напиши хоча б 10 символів 💡")
+            user_states.pop(uid, None)
+            return
         last_idea = daily_limits.get(uid, {}).get("last_idea_text", "")
         if last_idea and last_idea.lower().strip() == text.lower().strip():
             await msg.answer("❌ Таку ідею ти вже пропонував! Придумай щось нове 💡")
@@ -1187,6 +1236,39 @@ async def handler(msg: types.Message):
         )
         return
 
+    if text == "🧩 Emoji-загадка":
+        if check_daily(uid, "emoji_game"):
+            await msg.answer("🧩 Сьогодні вже грав! Повертайся завтра 😊")
+            return
+        riddle = random.choice(EMOJI_RIDDLES)
+        emoji_game[uid] = {"riddle": riddle, "attempts": 0}
+        await msg.answer(
+            f"🧩 Вгадай що це:\n\n"
+            f"{riddle['emoji']}\n\n"
+            f"Підказка: {riddle['hint']}\n\n"
+            f"У тебе 3 спроби! Пиши відповідь:"
+        )
+        return
+
+    # Обробка відповіді на emoji-загадку
+    if uid in emoji_game:
+        game = emoji_game[uid]
+        riddle = game["riddle"]
+        game["attempts"] += 1
+        if text.lower().strip() == riddle["answer"].lower():
+            emoji_game.pop(uid, None)
+            mark_daily(uid, "emoji_game")
+            actual = add_daily_coins(uid, 5)
+            await msg.answer(f"🎉 Правильно! {riddle['emoji']} = {riddle['answer'].upper()}\n+{actual} 🪙")
+        elif game["attempts"] >= 3:
+            emoji_game.pop(uid, None)
+            mark_daily(uid, "emoji_game")
+            await msg.answer(f"😅 Не вгадав!\nПравильна відповідь: {riddle['answer'].upper()} {riddle['emoji']}\nСпробуй завтра!")
+        else:
+            left = 3 - game["attempts"]
+            await msg.answer(f"❌ Не те! Залишилось спроб: {left}")
+        return
+
     if text == "🤫 Таємний друг":
         global secret_friend_pairs, secret_friend_cycle
         if not secret_friend_cycle:
@@ -1218,6 +1300,18 @@ async def handler(msg: types.Message):
                 user_states[uid] = "shop_gift_who"
                 await msg.answer("Введи @username того, кому хочеш подарувати монети:")
                 return
+
+            # Глобальний замок для місця в класі
+            if item["id"] == SEAT_ITEM_ID:
+                wk = week_str()
+                if wk in seat_lock and seat_lock[wk] != uid:
+                    buyer_name = get_user_name(seat_lock[wk])
+                    await msg.answer(
+                        f"🪑 Місце вже зайняте!\n"
+                        f"{buyer_name} вже купив це місце цього тижня.\n"
+                        f"Спробуй наступного тижня 😊"
+                    )
+                    return
             if item["price"] > 0 and check_weekly_purchase(uid, item["id"]):
                 await msg.answer(f"❌ {item['name']} вже купував цього тижня!\nПоверни наступного тижня 😊")
                 return
@@ -1230,6 +1324,9 @@ async def handler(msg: types.Message):
                 return
             remove_coins_from(uid, item["price"])
             mark_weekly_purchase(uid, item["id"])
+            # Записуємо глобальний замок для місця
+            if item["id"] == SEAT_ITEM_ID:
+                seat_lock[week_str()] = uid
             if purchases_sheet:
                 purchases_sheet.append_row([now_str(), get_user_name(uid), item["name"], item["price"]])
             await notify_admin(
@@ -1342,28 +1439,28 @@ async def morning_digest():
     global gold_coin_log
     while True:
         now = datetime.now(kyiv)
+        target = now.replace(hour=7, minute=45, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        await asyncio.sleep((target - now).total_seconds())
 
-        # Перевірка канікул
+        # Перевірка канікул — після пробудження о 7:45
+        now = datetime.now(kyiv)
+        on_vacation = False
         if vacations_sheet:
             try:
                 vrows = vacations_sheet.get_all_records()
-                on_vacation = False
                 for vr in vrows:
                     start = datetime.strptime(str(vr["початок"]), "%d.%m.%Y").date()
                     end   = datetime.strptime(str(vr["кінець"]),  "%d.%m.%Y").date()
                     if start <= now.date() <= end:
                         on_vacation = True
                         break
-                if on_vacation:
-                    await asyncio.sleep(3600)
-                    continue
             except Exception:
                 pass
-
-        target = now.replace(hour=7, minute=45, second=0, microsecond=0)
-        if now >= target:
-            target += timedelta(days=1)
-        await asyncio.sleep((target - now).total_seconds())
+        if on_vacation:
+            await asyncio.sleep(60)
+            continue
 
         now = datetime.now(kyiv)
         weekday = now.weekday()
