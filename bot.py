@@ -25,6 +25,15 @@ ADMIN_DISPLAY = {
 }
 ADMIN_NAMES = set(ADMIN_DISPLAY.keys())
 NOTIFY_ADMIN_ID = int(os.getenv("NOTIFY_ADMIN_ID", "0"))
+# Всі адміни отримують сповіщення
+ADMIN_IDS = list(filter(None, [
+    NOTIFY_ADMIN_ID,
+    5687913918,   # Марія Чала
+    2106101399,   # Лілія Шрам
+]))
+
+# Всі адміни отримують сповіщення
+ADMIN_IDS = [NOTIFY_ADMIN_ID, 5687913918, 2106101399]
 
 # Максимум монет на день
 DAILY_COIN_LIMIT = 15
@@ -70,17 +79,17 @@ EMOJI_RIDDLES = [
 # ================= ДЗВІНКИ =================
 
 BELLS = [
-    (1,  "08:00", "08:45"),
-    (2,  "08:50", "09:35"),
-    (3,  "09:40", "10:25"),
-    (4,  "10:30", "11:15"),
-    (5,  "11:30", "12:15"),
-    (6,  "12:20", "13:05"),
-    (7,  "13:10", "13:55"),
-    (8,  "14:00", "14:45"),
-    (9,  "14:50", "15:35"),
-    (10, "15:40", "16:25"),
-    (11, "16:30", "17:15"),
+    (1,  "08:00", "08:35"),
+    (2,  "08:40", "09:15"),
+    (3,  "09:20", "09:55"),
+    (4,  "10:00", "10:35"),
+    (5,  "10:40", "11:15"),
+    (6,  "11:30", "12:05"),
+    (7,  "12:10", "12:45"),
+    (8,  "12:50", "13:25"),
+    (9,  "13:30", "14:05"),
+    (10, "14:10", "14:45"),
+    (11, "14:50", "15:25"),
 ]
 BELLS_MAP = {start: num for num, start, _ in BELLS}
 
@@ -544,11 +553,12 @@ def has_russian(text: str) -> bool:
     return any(c in RUSSIAN_ONLY for c in text)
 
 async def notify_admin(text: str):
-    if NOTIFY_ADMIN_ID:
-        try:
-            await bot.send_message(NOTIFY_ADMIN_ID, text)
-        except Exception:
-            pass
+    for admin_id in ADMIN_IDS:
+        if admin_id:
+            try:
+                await bot.send_message(admin_id, text)
+            except Exception:
+                pass
 
 def check_daily(uid: str, action: str) -> bool:
     return daily_limits.get(uid, {}).get(action) == today_str()
@@ -863,7 +873,42 @@ async def handler(msg: types.Message):
 
     # ===== СТАНИ =====
 
-    if user_states.get(uid) == "idea":
+    if user_states.get(uid) == "challenge_report":
+        # Учень звітує про виконання челенджу
+        user_states.pop(uid, None)
+        name = get_user_name(uid)
+        # Знаходимо його челендж
+        challenge_text = ""
+        for aid, data in pending_approvals.items():
+            if data["uid"] == uid and data["action"] == "challenge":
+                challenge_text = data["text"]
+                break
+        await notify_admin(
+            f"🎯 Звіт про челендж!\n\n"
+            f"Учень: {name}\n"
+            f"Завдання: {challenge_text}\n"
+            f"Звіт: {text}\n\n"
+            f"Нарахувати +5 🪙?\n"
+            f"{'✅ /approve ' + [aid for aid, d in pending_approvals.items() if d['uid'] == uid and d['action'] == 'challenge'][0] if any(d['uid'] == uid and d['action'] == 'challenge' for d in pending_approvals.values()) else '(заявка не знайдена)'}"
+        )
+        # Публікуємо досягнення всьому класу
+        users = get_all_users()
+        achievement_text = (
+            f"🏆 Досягнення!\n\n"
+            f"{name} виконав челендж:\n"
+            f"📌 {challenge_text}\n\n"
+            f"💬 Звіт: {text}\n\n"
+            f"Красавець! 💪"
+        )
+        for tuid in users:
+            if tuid == uid:
+                continue
+            try:
+                await bot.send_message(int(tuid), achievement_text)
+            except Exception:
+                pass
+        await msg.answer("✅ Звіт надіслано вчителю і опубліковано класу! Чекай на монети 🪙")
+        return
         # Мінімум 10 символів
         if len(text.strip()) < 10:
             await msg.answer("❌ Ідея занадто коротка! Напиши хоча б 10 символів 💡")
@@ -889,10 +934,12 @@ async def handler(msg: types.Message):
         return
 
     if user_states.get(uid) == "meme":
+        if not msg.photo and not msg.animation and not msg.video and not msg.sticker:
+            await msg.answer("😂 Скинь мем як фото, гіф або відео — не текст!")
+            return
         mark_daily(uid, "meme")
         user_states.pop(uid, None)
         approval_id = f"meme_{uid}_{today_str()}"
-        # Зберігаємо message_id щоб потім переслати всім
         pending_approvals[approval_id] = {
             "uid": uid, "action": "meme", "text": "мем",
             "coins": 5, "msg_id": msg.message_id
@@ -1596,7 +1643,43 @@ async def compliment_of_day():
             except Exception: pass
         await asyncio.sleep(60)
 
-async def secret_friend_task():
+async def challenge_report_task():
+    """О 19:00 питає учнів що отримали челендж — чи виконали."""
+    while True:
+        now = datetime.now(kyiv)
+        target = now.replace(hour=19, minute=0, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        await asyncio.sleep((target - now).total_seconds())
+
+        today = today_str()
+        # Знаходимо всі виконані сьогодні челенджі
+        to_report = []
+        for approval_id, data in list(pending_approvals.items()):
+            if data["action"] == "challenge":
+                to_report.append((approval_id, data))
+
+        # Також питаємо тих хто отримав челендж але ще не звітував
+        for uid_c, limits in daily_limits.items():
+            if limits.get("challenge") == today:
+                # Перевіряємо чи вже є заявка
+                has_pending = any(
+                    d["uid"] == uid_c and d["action"] == "challenge"
+                    for d in pending_approvals.values()
+                )
+                if not has_pending:
+                    continue
+                try:
+                    await bot.send_message(
+                        int(uid_c),
+                        f"🎯 Як пройшов твій челендж?\n\n"
+                        f"Напиши що саме зробив — вчитель побачить і нарахує монети! 💪"
+                    )
+                    user_states[uid_c] = f"challenge_report"
+                except Exception:
+                    pass
+
+        await asyncio.sleep(60)
     global secret_friend_pairs, secret_friend_cycle
     while True:
         now = datetime.now(kyiv)
@@ -1650,6 +1733,7 @@ async def main():
     asyncio.create_task(reset_wake_daily())
     asyncio.create_task(compliment_of_day())
     asyncio.create_task(secret_friend_task())
+    asyncio.create_task(challenge_report_task())
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
