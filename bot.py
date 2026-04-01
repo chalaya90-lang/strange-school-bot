@@ -79,17 +79,18 @@ EMOJI_RIDDLES = [
 # ================= ДЗВІНКИ =================
 
 BELLS = [
-    (1,  "08:00", "08:35"),
-    (2,  "08:40", "09:15"),
-    (3,  "09:20", "09:55"),
-    (4,  "10:00", "10:35"),
-    (5,  "10:40", "11:15"),
-    (6,  "11:30", "12:05"),
-    (7,  "12:10", "12:45"),
-    (8,  "12:50", "13:25"),
-    (9,  "13:30", "14:05"),
-    (10, "14:10", "14:45"),
-    (11, "14:50", "15:25"),
+    (1,  "08:00", "08:45"),
+    (2,  "08:50", "09:35"),
+    (3,  "09:40", "10:25"),
+    (4,  "10:30", "11:15"),
+    (5,  "11:30", "12:15"),
+    (6,  "12:20", "13:05"),
+    (7,  "13:10", "13:55"),
+    (8,  "14:00", "14:45"),
+    (9,  "14:50", "15:35"),
+    (10, "15:40", "16:25"),
+    (11, "16:30", "17:15"),
+    (12, "17:20", "18:05"),
 ]
 BELLS_MAP = {start: num for num, start, _ in BELLS}
 
@@ -975,14 +976,6 @@ async def handler(msg: types.Message):
         await msg.answer("💌 Повідомлення надіслано анонімно!\nМонети отримаєш після схвалення вчителя ⏳")
         return
 
-    if user_states.get(uid) == "absence":
-        if absence_sheet:
-            absence_sheet.append_row([now_str(), get_user_name(uid), text])
-        user_states.pop(uid, None)
-        await notify_admin(f"📩 Відсутність!\n{get_user_name(uid)}\nПричина: {text}")
-        await msg.answer("✅ Записано! Вчитель отримав сповіщення.")
-        return
-
     if user_states.get(uid) == "announcement":
         if not is_admin(uid):
             user_states.pop(uid, None)
@@ -1164,8 +1157,49 @@ async def handler(msg: types.Message):
         return
 
     if text == "📩 Повідомити про відсутність":
-        user_states[uid] = "absence"
-        await msg.answer("Вкажи причину відсутності:")
+        absence_kb = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="🤒 Хворію")],
+                [KeyboardButton(text="👨‍👩‍👧 Сімейні обставини")],
+                [KeyboardButton(text="🏥 Йду до лікаря")],
+                [KeyboardButton(text="📝 Інша причина")],
+                [KeyboardButton(text="🔙 Назад")],
+            ],
+            resize_keyboard=True
+        )
+        user_states[uid] = "absence_choose"
+        await msg.answer("Вкажи причину відсутності:", reply_markup=absence_kb)
+        return
+
+    if user_states.get(uid) == "absence_choose":
+        if text == "🔙 Назад":
+            user_states.pop(uid, None)
+            await msg.answer("Головне меню 👇", reply_markup=build_main_kb(uid))
+            return
+        if text in ("🤒 Хворію", "👨‍👩‍👧 Сімейні обставини", "🏥 Йду до лікаря"):
+            if absence_sheet:
+                absence_sheet.append_row([now_str(), get_user_name(uid), text])
+            user_states.pop(uid, None)
+            await notify_admin(f"📩 Відсутність!\n{get_user_name(uid)}\nПричина: {text}")
+            await msg.answer("✅ Записано! Вчитель отримав сповіщення.", reply_markup=build_main_kb(uid))
+            return
+        if text == "📝 Інша причина":
+            user_states[uid] = "absence_text"
+            await msg.answer("Напиши причину:")
+            return
+        # Якщо написав щось інше — просимо обрати кнопку
+        await msg.answer("Будь ласка, обери причину з кнопок 👆")
+        return
+
+    if user_states.get(uid) == "absence_text":
+        if len(text.strip()) < 3:
+            await msg.answer("Напиши причину детальніше:")
+            return
+        if absence_sheet:
+            absence_sheet.append_row([now_str(), get_user_name(uid), text])
+        user_states.pop(uid, None)
+        await notify_admin(f"📩 Відсутність!\n{get_user_name(uid)}\nПричина: {text}")
+        await msg.answer("✅ Записано! Вчитель отримав сповіщення.", reply_markup=build_main_kb(uid))
         return
 
     if text == "💡 Ідеї для класу":
@@ -1640,6 +1674,52 @@ async def compliment_of_day():
             try:
                 await bot.send_message(int(b), f"💌 Комплімент тижня!\n\nНапиши щось приємне для {get_user_name(a)} 😊")
                 user_states[b] = f"compliment_to:{a}"
+            except Exception: pass
+        await asyncio.sleep(60)
+
+async def secret_friend_task():
+    """Кожні два тижні (в понеділок парного тижня) формує 3 пари таємних друзів."""
+    global secret_friend_pairs, secret_friend_cycle
+    while True:
+        now = datetime.now(kyiv)
+        target = now.replace(hour=8, minute=30, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        await asyncio.sleep((target - now).total_seconds())
+        now = datetime.now(kyiv)
+        if now.weekday() != 0:
+            await asyncio.sleep(60)
+            continue
+        week_num = int(now.strftime("%W"))
+        if week_num % 2 != 0:
+            await asyncio.sleep(60)
+            continue
+        cycle_key = now.strftime("%Y-W%W")
+        if secret_friend_cycle == cycle_key:
+            await asyncio.sleep(60)
+            continue
+        secret_friend_cycle = cycle_key
+        users = get_all_users()
+        uids = list(users.keys())
+        if len(uids) < 2:
+            await asyncio.sleep(60)
+            continue
+        random.shuffle(uids)
+        pairs_count = min(3, len(uids) // 2)
+        selected = uids[:pairs_count * 2]
+        secret_friend_pairs = {}
+        for i in range(0, len(selected), 2):
+            a, b = selected[i], selected[i+1]
+            secret_friend_pairs[a] = b
+            secret_friend_pairs[b] = a
+        for uid_sf in secret_friend_pairs:
+            try:
+                await bot.send_message(
+                    int(uid_sf),
+                    "🤫 Старт нового циклу Таємного друга!\n\n"
+                    "Тобі призначено таємного друга на 2 тижні 💌\n"
+                    "Натисни 🤫 Таємний друг щоб написати йому анонімно!"
+                )
             except Exception: pass
         await asyncio.sleep(60)
 
