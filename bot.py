@@ -343,9 +343,9 @@ def is_admin(user_id: str) -> bool:
 def find_user_by_username(username: str) -> str | None:
     if not users_sheet:
         return None
-    clean = username.lstrip("@").lower()
+    clean = username.lstrip("@").lower().strip()
     for i, u in enumerate(users_sheet.col_values(2)):
-        if str(u).lower() == clean:
+        if str(u).lower().strip() == clean:
             return str(users_sheet.cell(i + 1, 1).value)
     return None
 
@@ -1582,11 +1582,12 @@ async def morning_digest():
             except Exception:
                 pass
 
-        # Золота монета
+        # Золота монета — раз на місяць, зберігається в Банк
         current_month = now.strftime("%Y-%m")
         gold_msg = ""
-        if gold_coin_log != current_month and users:
-            gold_coin_log = current_month
+        saved_gold_month = get_bank_value("gold_month", "")
+        if saved_gold_month != current_month and users:
+            set_bank_value("gold_month", current_month)
             lucky_uid = random.choice(list(users.keys()))
             add_coins(lucky_uid, 50)
             gold_msg = f"\n\n🌟 Золота монета цього місяця — {get_user_name(lucky_uid)}! +50 🪙"
