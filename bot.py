@@ -1856,7 +1856,54 @@ async def secret_friend_task():
             except Exception: pass
         await asyncio.sleep(60)
 
-async def challenge_report_task():
+async def daily_class_tax():
+    """Щодня о 23:00 знімає по 2 монети з кожного учня в банк класу."""
+    while True:
+        now = datetime.now(kyiv)
+        target = now.replace(hour=23, minute=0, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        await asyncio.sleep((target - now).total_seconds())
+
+        # Тільки в шкільні дні
+        now = datetime.now(kyiv)
+        if now.weekday() >= 5:
+            await asyncio.sleep(60)
+            continue
+
+        # Перевірка канікул
+        on_vacation = False
+        if vacations_sheet:
+            try:
+                vrows = vacations_sheet.get_all_records()
+                for vr in vrows:
+                    start = datetime.strptime(str(vr["початок"]), "%d.%m.%Y").date()
+                    end   = datetime.strptime(str(vr["кінець"]),  "%d.%m.%Y").date()
+                    if start <= now.date() <= end:
+                        on_vacation = True
+                        break
+            except Exception:
+                pass
+
+        if on_vacation:
+            await asyncio.sleep(60)
+            continue
+
+        users = get_all_users()
+        total_collected = 0
+        for tuid, info in users.items():
+            if is_admin(tuid):
+                continue
+            coins = info["coins"]
+            tax = min(2, coins)
+            if tax > 0:
+                remove_coins_from(tuid, tax)
+                total_collected += tax
+
+        if total_collected > 0:
+            set_class_bank(get_class_bank() + total_collected)
+
+        await asyncio.sleep(60)
     """О 19:00 питає учнів що отримали челендж — чи виконали."""
     while True:
         now = datetime.now(kyiv)
@@ -1947,6 +1994,7 @@ async def main():
     asyncio.create_task(compliment_of_day())
     asyncio.create_task(secret_friend_task())
     asyncio.create_task(challenge_report_task())
+    asyncio.create_task(daily_class_tax())
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
