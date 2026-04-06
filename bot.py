@@ -1993,7 +1993,6 @@ async def main():
     asyncio.create_task(reset_wake_daily())
     asyncio.create_task(compliment_of_day())
     asyncio.create_task(secret_friend_task())
-    asyncio.create_task(challenge_report_task())
     asyncio.create_task(daily_class_tax())
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
