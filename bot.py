@@ -751,7 +751,10 @@ async def cmd_award(msg: types.Message):
         return
     parts = (msg.text or "").split(maxsplit=3)
     if len(parts) < 4:
-        await msg.answer("Формат: /award @username кількість причина\nНаприклад: /award @Popka_MuravR 10 за креативний нік")
+        await msg.answer(
+            "Формат: /award @username кількість причина\n"
+            "Або за ID: /awardid 5933604100 10 причина"
+        )
         return
     _, uname_t, amount_str, reason = parts
     if not amount_str.isdigit():
@@ -759,19 +762,148 @@ async def cmd_award(msg: types.Message):
         return
     target_uid = find_user_by_username(uname_t)
     if not target_uid:
-        await msg.answer(f"Не знайшов {uname_t}")
+        await msg.answer(f"Не знайшов {uname_t}\nСпробуй /awardid з числовим ID")
         return
     amount = int(amount_str)
-    add_coins(target_uid, amount)  # нагорода не враховує денний ліміт
+    add_coins(target_uid, amount)
     target_name = get_user_name(target_uid)
     await msg.answer(f"🏆 {target_name} +{amount} 🪙\nПричина: {reason}")
     try:
+        await bot.send_message(int(target_uid), f"🏆 Спеціальна нагорода!\n+{amount} 🪙\nПричина: {reason}")
+    except Exception:
+        pass
+
+@router.message(Command("awardid"))
+async def cmd_awardid(msg: types.Message):
+    """Нарахувати монети за числовим ID: /awardid 5933604100 10 причина"""
+    uid = str(msg.chat.id)
+    if not is_admin(uid):
+        return
+    parts = (msg.text or "").split(maxsplit=3)
+    if len(parts) < 4:
+        await msg.answer("Формат: /awardid 5933604100 10 причина")
+        return
+    _, target_id, amount_str, reason = parts
+    if not amount_str.isdigit() or not target_id.isdigit():
+        await msg.answer("ID і кількість мають бути числами")
+        return
+    amount = int(amount_str)
+    add_coins(target_id, amount)
+    target_name = get_user_name(target_id)
+    await msg.answer(f"🏆 {target_name} +{amount} 🪙\nПричина: {reason}")
+    try:
+        await bot.send_message(int(target_id), f"🏆 Спеціальна нагорода!\n+{amount} 🪙\nПричина: {reason}")
+    except Exception:
+        pass
+
+@router.message(Command("fineid"))
+async def cmd_fineid(msg: types.Message):
+    """Штраф за числовим ID: /fineid 5933604100 10 причина"""
+    uid = str(msg.chat.id)
+    if not is_admin(uid):
+        return
+    parts = (msg.text or "").split(maxsplit=3)
+    if len(parts) < 4:
+        await msg.answer("Формат: /fineid 5933604100 10 причина")
+        return
+    _, target_id, amount_str, reason = parts
+    if not amount_str.isdigit() or not target_id.isdigit():
+        await msg.answer("ID і кількість мають бути числами")
+        return
+    amount = int(amount_str)
+    current = get_coins(target_id)
+    remove_coins_from(target_id, amount)
+    actual = min(amount, current)
+    target_name = get_user_name(target_id)
+    await msg.answer(f"👹 {target_name} -{actual} 🪙\nПричина: {reason}")
+    try:
         await bot.send_message(
-            int(target_uid),
-            f"🏆 Спеціальна нагорода!\n+{amount} 🪙\nПричина: {reason}"
+            int(target_id),
+            f"👹 Демогоргон з'їв твої монети!\n-{actual} 🪙\nПричина: {reason}"
         )
     except Exception:
         pass
+
+@router.message(Command("classfire"))
+async def cmd_classfire(msg: types.Message):
+    """Штраф з банку класу + сповіщення всім: /classfire 20 зрив уроку"""
+    uid = str(msg.chat.id)
+    if not is_admin(uid):
+        return
+    parts = (msg.text or "").split(maxsplit=2)
+    if len(parts) < 3:
+        await msg.answer(
+            "Формат: /classfire кількість причина\n\n"
+            "Приклади штрафів:\n"
+            "🔥 /classfire 20 зрив уроку\n"
+            "📱 /classfire 10 масове використання телефонів\n"
+            "🗑️ /classfire 5 безлад в класі"
+        )
+        return
+    _, amount_str, reason = parts
+    if not amount_str.isdigit():
+        await msg.answer("Кількість має бути числом")
+        return
+    amount = int(amount_str)
+    current_bank = get_class_bank()
+    actual = min(amount, current_bank)
+    set_class_bank(current_bank - actual)
+
+    fine_text = (
+        f"👹 Увага, клас!\n\n"
+        f"Демогоргон прийшов за банком класу!\n\n"
+        f"Причина: {reason}\n"
+        f"Штраф: -{actual} 🪙 з банку класу\n"
+        f"Залишок банку: {get_class_bank()} 🪙\n\n"
+        f"Наступного разу будьте уважніші! 😤"
+    )
+    users = get_all_users()
+    for tuid in users:
+        try:
+            await bot.send_message(int(tuid), fine_text)
+        except Exception:
+            pass
+    await msg.answer(f"✅ Штраф -{actual} 🪙 з банку класу!\nПричина: {reason}\nЗалишок: {get_class_bank()} 🪙")
+
+@router.message(Command("classbonus"))
+async def cmd_classbonus(msg: types.Message):
+    """Поповнення банку класу + сповіщення всім: /classbonus 30 перемога в олімпіаді"""
+    uid = str(msg.chat.id)
+    if not is_admin(uid):
+        return
+    parts = (msg.text or "").split(maxsplit=2)
+    if len(parts) < 3:
+        await msg.answer(
+            "Формат: /classbonus кількість причина\n\n"
+            "Приклади винагород:\n"
+            "🏆 /classbonus 30 перемога в олімпіаді\n"
+            "⭐️ /classbonus 10 похвала від вчителя\n"
+            "🎨 /classbonus 20 виступ на заході\n"
+            "📚 /classbonus 15 всі здали домашнє"
+        )
+        return
+    _, amount_str, reason = parts
+    if not amount_str.isdigit():
+        await msg.answer("Кількість має бути числом")
+        return
+    amount = int(amount_str)
+    set_class_bank(get_class_bank() + amount)
+
+    bonus_text = (
+        f"🌟 Увага, клас!\n\n"
+        f"Банк класу поповнився!\n\n"
+        f"Причина: {reason}\n"
+        f"Бонус: +{amount} 🪙 в банк класу\n"
+        f"Баланс банку: {get_class_bank()} 🪙\n\n"
+        f"Так тримати! 💪🎉"
+    )
+    users = get_all_users()
+    for tuid in users:
+        try:
+            await bot.send_message(int(tuid), bonus_text)
+        except Exception:
+            pass
+    await msg.answer(f"✅ Бонус +{amount} 🪙 в банк класу!\nПричина: {reason}\nБаланс: {get_class_bank()} 🪙")
 
 @router.message(Command("fine"))
 async def cmd_fine(msg: types.Message):
