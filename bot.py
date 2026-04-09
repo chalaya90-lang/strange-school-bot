@@ -680,9 +680,9 @@ async def cmd_approve(msg: types.Message):
             for admin_id in ADMIN_IDS:
                 if admin_id:
                    try:
-        await bot.send_message(user_id, message_text)
-    except Exception:
-        pass
+                      await bot.send_message(user_id, message_text)
+                   except Exception:
+                       pass
         await msg.answer(f"✅ Мем схвалено і опубліковано всьому класу!\n{target_name} +{actual} 🪙")
     else:
         await msg.answer(f"✅ Схвалено! {target_name} +{actual} 🪙")
