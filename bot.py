@@ -1081,7 +1081,7 @@ async def handler(msg: types.Message):
             f"😂 Мем від {get_user_name(uid)} — перевір вище ⬆️\n\n"
             f"✅ /approve {approval_id}\n❌ /reject {approval_id}"
         )
-            for admin_id in ADMIN_IDS:
+        for admin_id in ADMIN_IDS:
                 if admin_id:
                     try:
                         await msg.forward(admin_id)
