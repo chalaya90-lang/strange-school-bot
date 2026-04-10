@@ -1870,13 +1870,11 @@ async def daily_class_tax():
             target += timedelta(days=1)
         await asyncio.sleep((target - now).total_seconds())
 
-        # Тільки в шкільні дні
         now = datetime.now(kyiv)
         if now.weekday() >= 5:
             await asyncio.sleep(60)
             continue
 
-        # Перевірка канікул
         on_vacation = False
         if vacations_sheet:
             try:
@@ -1909,6 +1907,9 @@ async def daily_class_tax():
             set_class_bank(get_class_bank() + total_collected)
 
         await asyncio.sleep(60)
+
+
+async def challenge_report_task():
     """О 19:00 питає учнів що отримали челендж — чи виконали."""
     while True:
         now = datetime.now(kyiv)
@@ -1918,76 +1919,27 @@ async def daily_class_tax():
         await asyncio.sleep((target - now).total_seconds())
 
         today = today_str()
-        # Знаходимо всі виконані сьогодні челенджі
-        to_report = []
-        for approval_id, data in list(pending_approvals.items()):
-            if data["action"] == "challenge":
-                to_report.append((approval_id, data))
-
-        # Також питаємо тих хто отримав челендж але ще не звітував
         for uid_c, limits in daily_limits.items():
-            if limits.get("challenge") == today:
-                # Перевіряємо чи вже є заявка
-                has_pending = any(
-                    d["uid"] == uid_c and d["action"] == "challenge"
-                    for d in pending_approvals.values()
-                )
-                if not has_pending:
-                    continue
-                try:
-                    await bot.send_message(
-                        int(uid_c),
-                        f"🎯 Як пройшов твій челендж?\n\n"
-                        f"Напиши що саме зробив — вчитель побачить і нарахує монети! 💪"
-                    )
-                    user_states[uid_c] = f"challenge_report"
-                except Exception:
-                    pass
-
-        await asyncio.sleep(60)
-    global secret_friend_pairs, secret_friend_cycle
-    while True:
-        now = datetime.now(kyiv)
-        target = now.replace(hour=8, minute=30, second=0, microsecond=0)
-        if now >= target:
-            target += timedelta(days=1)
-        await asyncio.sleep((target - now).total_seconds())
-        now = datetime.now(kyiv)
-        if now.weekday() != 0:
-            await asyncio.sleep(60)
-            continue
-        week_num = int(now.strftime("%W"))
-        if week_num % 2 != 0:
-            await asyncio.sleep(60)
-            continue
-        cycle_key = now.strftime("%Y-W%W")
-        if secret_friend_cycle == cycle_key:
-            await asyncio.sleep(60)
-            continue
-        secret_friend_cycle = cycle_key
-        users = get_all_users()
-        uids = list(users.keys())
-        if len(uids) < 2:
-            await asyncio.sleep(60)
-            continue
-        random.shuffle(uids)
-        pairs_count = min(3, len(uids) // 2)
-        selected = uids[:pairs_count * 2]
-        secret_friend_pairs = {}
-        for i in range(0, len(selected), 2):
-            a, b = selected[i], selected[i+1]
-            secret_friend_pairs[a] = b
-            secret_friend_pairs[b] = a
-        for uid_sf in secret_friend_pairs:
+            if limits.get("challenge") != today:
+                continue
+            has_pending = any(
+                d["uid"] == uid_c and d["action"] == "challenge"
+                for d in pending_approvals.values()
+            )
+            if not has_pending:
+                continue
             try:
                 await bot.send_message(
-                    int(uid_sf),
-                    "🤫 Старт нового циклу Таємного друга!\n\n"
-                    "Тобі призначено таємного друга на 2 тижні 💌\n"
-                    "Натисни 🤫 Таємний друг щоб написати йому анонімно!"
+                    int(uid_c),
+                    "🎯 Як пройшов твій челендж?\n\n"
+                    "Напиши що саме зробив — вчитель побачить і нарахує монети! 💪"
                 )
-            except Exception: pass
+                user_states[uid_c] = "challenge_report"
+            except Exception:
+                pass
+
         await asyncio.sleep(60)
+
 
 # ================= MAIN =================
 
