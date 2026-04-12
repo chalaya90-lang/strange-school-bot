@@ -6,8 +6,10 @@ from datetime import datetime, timedelta
 import pytz
 
 from aiogram import Bot, Dispatcher, types, Router
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from aiogram.types import FSInputFile
+from aiogram.types import (
+    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
+    FSInputFile, Message
+)
 from aiogram.filters import Command
 
 import gspread
@@ -25,21 +27,15 @@ ADMIN_DISPLAY = {
 }
 ADMIN_NAMES = set(ADMIN_DISPLAY.keys())
 NOTIFY_ADMIN_ID = int(os.getenv("NOTIFY_ADMIN_ID", "0"))
-# Всі адміни отримують сповіщення
+
 ADMIN_IDS = list(filter(None, [
     NOTIFY_ADMIN_ID,
     5687913918,   # Марія Чала
     2106101399,   # Лілія Шрам
-    1047959580,   # Oд
+    1047959580,   # Од
 ]))
 
-# Всі адміни отримують сповіщення
-ADMIN_IDS = [NOTIFY_ADMIN_ID, 5687913918, 1047959580, 2106101399]
-
-# Максимум монет на день
 DAILY_COIN_LIMIT = 15
-
-# ID товару місця — блокується на весь клас на тиждень
 SEAT_ITEM_ID = "seat"
 
 # ================= EMOJI ЗАГАДКИ =================
@@ -63,17 +59,15 @@ EMOJI_RIDDLES = [
     {"emoji": "🐉🔥🧒", "answers": ["як приручити дракона", "приручити дракона", "дракон", "беззубик"], "hint": "хлопець і дракон Беззубик"},
     {"emoji": "🍕🗽🐢", "answers": ["черепашки ніндзя", "черепашки-ніндзя", "tmnt"], "hint": "герої в панцирі"},
     {"emoji": "⚡️🏎️🏁", "answers": ["блискавка маккуїн", "блискавка маккуін", "маккуїн", "маккуін", "тачки", "cars"], "hint": "мультфільм Тачки"},
-    {"emoji": "🧊🏒🇨🇦", "answers": ["льодова арена", "хокей"], "hint": "канадський спорт"},
     {"emoji": "🦁🐯🐻", "answers": ["книга джунглів", "маугли", "мауглі"], "hint": "Мауглі і тварини"},
     {"emoji": "👦🎈🔴", "answers": ["воно", "it"], "hint": "страшний клоун"},
     {"emoji": "🦸‍♀️💪🌟", "answers": ["диво жінка", "диво-жінка", "wonder woman"], "hint": "супергероїня DC"},
     {"emoji": "🐼🥋🍜", "answers": ["kung fu panda", "кунг фу панда", "кунг-фу панда", "панда"], "hint": "панда і кунг-фу"},
     {"emoji": "🏰👸🐲", "answers": ["відважна", "brave", "мерида"], "hint": "шотландська принцеса Мерида"},
     {"emoji": "🤥👃🪵", "answers": ["піноккіо", "pinocchio"], "hint": "дерев'яний хлопчик"},
-    {"emoji": "🌹👹", "answers": ["красуня і чудовисько", "красуня та чудовисько", "красавиця і чудовисько", "красавиця та чудовисько", "beauty and the beast"], "hint": "казка Disney"},
+    {"emoji": "🌹👹", "answers": ["красуня і чудовисько", "красуня та чудовисько", "beauty and the beast"], "hint": "казка Disney"},
     {"emoji": "🧞‍♂️🪔✨", "answers": ["аладдін", "аладін", "aladdin"], "hint": "джин і три бажання"},
     {"emoji": "🐠🦈🌊", "answers": ["в пошуках немо", "пошуки немо", "немо"], "hint": "тато шукає сина"},
-    {"emoji": "👣🌋🗺️", "answers": ["загублений світ", "the lost world"], "hint": "пригоди і динозаври"},
     {"emoji": "🎭😂😢", "answers": ["головоломка", "inside out"], "hint": "емоції всередині голови"},
 ]
 
@@ -197,9 +191,7 @@ FACTS = [
     "🌟 Вся ДНК людини розтягнута була б завдовжки 2 метри, а в кожній клітині вона скручена.",
     "🐋 Горбаті кити складають нові пісні щороку і навчають одне одного.",
     "🍇 Виноград вибухає в мікрохвильовій печі — науковці спеціально вивчали чому!",
-    "🌍 Африканський слон вагою 6 тонн може стояти на трьох ногах для відпочинку.",
     "🦋 Деякі метелики мігрують на відстань до 4800 км — як монарх з Канади до Мексики.",
-    "🎻 Скрипка Страдіварі XVII століття досі звучить краще за сучасні — вчені не знають чому.",
     "🌊 Найбільша хвиля, зафіксована людьми, була висотою 524 метри — на Алясці у 1958 році.",
     "🐘 Слони вміють плакати і проявляти горе — вони навіть повертаються до кісток загиблих.",
 ]
@@ -458,53 +450,7 @@ def delete_basket_row(row: int):
         return
     baskets_sheet.delete_rows(row)
 
-# ================= КЛАВІАТУРИ =================
-
-def build_main_kb(user_id: str) -> ReplyKeyboardMarkup:
-    modes = get_active_modes()
-    rows = [
-        [KeyboardButton(text="📅 Розклад"),      KeyboardButton(text="🔔 Дзвінки")],
-        [KeyboardButton(text="📩 Повідомити про відсутність")],
-        [KeyboardButton(text="💡 Ідеї для класу")],
-    ]
-    row1 = []
-    if "мем"     in modes: row1.append(KeyboardButton(text="😂 Мем дня"))
-    if "челендж" in modes: row1.append(KeyboardButton(text="🎯 Челендж дня"))
-    if row1: rows.append(row1)
-
-    row2 = []
-    if "добро"   in modes: row2.append(KeyboardButton(text="💌 Написати добро"))
-    if "лотерея" in modes: row2.append(KeyboardButton(text="🎰 Удача"))
-    if row2: rows.append(row2)
-
-    rows.append([KeyboardButton(text="😴 Я прокинувся")])
-    rows.append([KeyboardButton(text="🤫 Таємний друг"), KeyboardButton(text="🧩 Emoji-загадка")])
-    rows.append([KeyboardButton(text="🛒 Магазин"), KeyboardButton(text="🧺 Спільні кошики")])
-    rows.append([KeyboardButton(text="🪙 Мої монетки"), KeyboardButton(text="🏦 Банк класу")])
-    rows.append([KeyboardButton(text="🏆 Рейтинг"), KeyboardButton(text="📬 Скарга")])
-    if is_admin(user_id):
-        rows.append([KeyboardButton(text="⚖️ Дія вчителя")])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
-
-teacher_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="➕ Плюс учню"),    KeyboardButton(text="➖ Мінус учню")],
-        [KeyboardButton(text="💸 Штраф класу"),  KeyboardButton(text="🕊️ Амністія")],
-        [KeyboardButton(text="📢 Оголошення")],
-        [KeyboardButton(text="🔙 Назад")],
-    ],
-    resize_keyboard=True
-)
-
-def shop_kb() -> ReplyKeyboardMarkup:
-    rows = []
-    for item in SHOP_ITEMS:
-        price_text = f"{item['price']} 🪙" if item["price"] > 0 else "безкоштовно"
-        rows.append([KeyboardButton(text=f"{item['emoji']} {item['name']} — {price_text}")])
-    rows.append([KeyboardButton(text="🔙 Назад")])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
-
-# ================= БОТ =================
+# ================= БОТ (оголошення ПЕРЕД хендлерами) =================
 
 bot = Bot(token=TOKEN)
 dp  = Dispatcher()
@@ -514,32 +460,16 @@ user_states: dict[str, str] = {}
 wake_log:    dict[str, str] = {}
 gold_coin_log: str = ""
 
-# Ліміти на день: uid → {дія: дата або значення}
 daily_limits: dict[str, dict] = {}
-
-# Покупки за тиждень: uid → {item_id: week_key}
 weekly_purchases: dict[str, dict] = {}
-
-# Удача: uid → список тижнів
 luck_log: dict[str, list] = {}
-
-# Комплімент тижня
 compliment_log: str = ""
-
-# Таємний друг
 secret_friend_pairs: dict[str, str] = {}
 secret_friend_cycle: str = ""
-
-# Очікують підтвердження адміна: approval_id → {uid, action, text, coins, msg_id}
 pending_approvals: dict[str, dict] = {}
-
-# Активна emoji-загадка: uid → {riddle, attempts}
 emoji_game: dict[str, dict] = {}
-
-# Глобальне блокування місця: week_key → uid хто купив
 seat_lock: dict[str, str] = {}
 
-# Літери є в рос. але не в укр.
 RUSSIAN_ONLY = set("ёъыэЁЪЫЭ")
 
 def today_str() -> str:
@@ -569,13 +499,11 @@ def mark_daily(uid: str, action: str):
     daily_limits.setdefault(uid, {})[action] = today_str()
 
 def get_daily_coins(uid: str) -> int:
-    """Скільки монет зароблено сьогодні."""
     if daily_limits.get(uid, {}).get("coins_date") != today_str():
         return 0
     return daily_limits.get(uid, {}).get("coins_today", 0)
 
 def add_daily_coins(uid: str, amount: int) -> int:
-    """Додає монети з урахуванням денного ліміту. Повертає скільки реально додано."""
     if daily_limits.get(uid, {}).get("coins_date") != today_str():
         daily_limits.setdefault(uid, {})["coins_today"] = 0
         daily_limits[uid]["coins_date"] = today_str()
@@ -593,10 +521,57 @@ def check_weekly_purchase(uid: str, item_id: str) -> bool:
 def mark_weekly_purchase(uid: str, item_id: str):
     weekly_purchases.setdefault(uid, {})[item_id] = week_str()
 
+# ================= КЛАВІАТУРИ =================
+
+def build_main_kb(user_id: str) -> ReplyKeyboardMarkup:
+    modes = get_active_modes()
+    rows = [
+        [KeyboardButton(text="📅 Розклад"),      KeyboardButton(text="🔔 Дзвінки")],
+        [KeyboardButton(text="📩 Повідомити про відсутність")],
+        [KeyboardButton(text="💡 Ідеї для класу")],
+    ]
+    row1 = []
+    if "мем"     in modes: row1.append(KeyboardButton(text="😂 Мем дня"))
+    if "челендж" in modes: row1.append(KeyboardButton(text="🎯 Челендж дня"))
+    if row1: rows.append(row1)
+
+    row2 = []
+    if "добро"   in modes: row2.append(KeyboardButton(text="💌 Написати добро"))
+    if "лотерея" in modes: row2.append(KeyboardButton(text="🎰 Удача"))
+    if row2: rows.append(row2)
+
+    rows.append([KeyboardButton(text="😴 Я прокинувся")])
+    rows.append([KeyboardButton(text="🤫 Таємний друг"), KeyboardButton(text="🧩 Emoji-загадка")])
+    rows.append([KeyboardButton(text="🛒 Магазин"), KeyboardButton(text="🧺 Спільні кошики")])
+    rows.append([KeyboardButton(text="🪙 Мої монетки"), KeyboardButton(text="🏦 Банк класу")])
+    rows.append([KeyboardButton(text="🏆 Рейтинг"), KeyboardButton(text="📬 Скарга")])
+    if is_admin(user_id):
+        rows.append([KeyboardButton(text="⚖️ Дія вчителя")])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+# Одна правильна версія teacher_kb як змінна (не функція)
+teacher_kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="➕ Плюс учню"),    KeyboardButton(text="➖ Мінус учню")],
+        [KeyboardButton(text="💸 Штраф класу"),  KeyboardButton(text="🕊️ Амністія")],
+        [KeyboardButton(text="📢 Оголошення")],
+        [KeyboardButton(text="🔙 Назад")],
+    ],
+    resize_keyboard=True
+)
+
+def shop_kb() -> ReplyKeyboardMarkup:
+    rows = []
+    for item in SHOP_ITEMS:
+        price_text = f"{item['price']} 🪙" if item["price"] > 0 else "безкоштовно"
+        rows.append([KeyboardButton(text=f"{item['emoji']} {item['name']} — {price_text}")])
+    rows.append([KeyboardButton(text="🔙 Назад")])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
 # ================= КОМАНДИ =================
 
 @router.message(Command("start"))
-async def cmd_start(msg: types.Message):
+async def cmd_start(msg: Message):
     uid = str(msg.chat.id)
     if is_registered(uid):
         await msg.answer(f"З поверненням, {get_user_name(uid)}! 😎", reply_markup=build_main_kb(uid))
@@ -608,11 +583,11 @@ async def cmd_start(msg: types.Message):
     )
 
 @router.message(Command("myid"))
-async def cmd_myid(msg: types.Message):
+async def cmd_myid(msg: Message):
     await msg.answer(f"Твій ID: `{msg.chat.id}`", parse_mode="Markdown")
 
 @router.message(Command("info"))
-async def cmd_info(msg: types.Message):
+async def cmd_info(msg: Message):
     info_text = (
         "📖 ДОВІДНИК КЛАСНОГО БОТА\n\n"
         "🪙 ЯК ЗАРОБЛЯТИ МОНЕТИ (макс. 15 на день):\n"
@@ -655,7 +630,7 @@ async def cmd_info(msg: types.Message):
     await msg.answer(info_text)
 
 @router.message(Command("approve"))
-async def cmd_approve(msg: types.Message):
+async def cmd_approve(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -668,11 +643,9 @@ async def cmd_approve(msg: types.Message):
     if not data:
         await msg.answer("❌ Заявку не знайдено або вже оброблено")
         return
-    # Нараховуємо монети з урахуванням денного ліміту
     actual = add_daily_coins(data["uid"], data["coins"])
     target_name = get_user_name(data["uid"])
 
-    # Якщо мем — публікуємо всім
     if data["action"] == "meme" and data.get("msg_id"):
         users = get_all_users()
         for tuid in users:
@@ -704,7 +677,7 @@ async def cmd_approve(msg: types.Message):
             pass
 
 @router.message(Command("reject"))
-async def cmd_reject(msg: types.Message):
+async def cmd_reject(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -728,7 +701,7 @@ async def cmd_reject(msg: types.Message):
         pass
 
 @router.message(Command("pending"))
-async def cmd_pending(msg: types.Message):
+async def cmd_pending(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -746,7 +719,7 @@ async def cmd_pending(msg: types.Message):
     await msg.answer(txt)
 
 @router.message(Command("award"))
-async def cmd_award(msg: types.Message):
+async def cmd_award(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -775,8 +748,7 @@ async def cmd_award(msg: types.Message):
         pass
 
 @router.message(Command("awardid"))
-async def cmd_awardid(msg: types.Message):
-    """Нарахувати монети за числовим ID: /awardid 5933604100 10 причина"""
+async def cmd_awardid(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -798,8 +770,7 @@ async def cmd_awardid(msg: types.Message):
         pass
 
 @router.message(Command("fineid"))
-async def cmd_fineid(msg: types.Message):
-    """Штраф за числовим ID: /fineid 5933604100 10 причина"""
+async def cmd_fineid(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -826,8 +797,7 @@ async def cmd_fineid(msg: types.Message):
         pass
 
 @router.message(Command("classfire"))
-async def cmd_classfire(msg: types.Message):
-    """Штраф з банку класу + сповіщення всім: /classfire 20 зрив уроку"""
+async def cmd_classfire(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -867,8 +837,7 @@ async def cmd_classfire(msg: types.Message):
     await msg.answer(f"✅ Штраф -{actual} 🪙 з банку класу!\nПричина: {reason}\nЗалишок: {get_class_bank()} 🪙")
 
 @router.message(Command("classbonus"))
-async def cmd_classbonus(msg: types.Message):
-    """Поповнення банку класу + сповіщення всім: /classbonus 30 перемога в олімпіаді"""
+async def cmd_classbonus(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -876,11 +845,9 @@ async def cmd_classbonus(msg: types.Message):
     if len(parts) < 3:
         await msg.answer(
             "Формат: /classbonus кількість причина\n\n"
-            "Приклади винагород:\n"
+            "Приклади:\n"
             "🏆 /classbonus 30 перемога в олімпіаді\n"
-            "⭐️ /classbonus 10 похвала від вчителя\n"
-            "🎨 /classbonus 20 виступ на заході\n"
-            "📚 /classbonus 15 всі здали домашнє"
+            "⭐️ /classbonus 10 похвала від вчителя"
         )
         return
     _, amount_str, reason = parts
@@ -907,13 +874,13 @@ async def cmd_classbonus(msg: types.Message):
     await msg.answer(f"✅ Бонус +{amount} 🪙 в банк класу!\nПричина: {reason}\nБаланс: {get_class_bank()} 🪙")
 
 @router.message(Command("fine"))
-async def cmd_fine(msg: types.Message):
+async def cmd_fine(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
     parts = (msg.text or "").split(maxsplit=3)
     if len(parts) < 4:
-        await msg.answer("Формат: /fine @username кількість причина\nНаприклад: /fine @earth_this 5 одна і та ж ідея")
+        await msg.answer("Формат: /fine @username кількість причина")
         return
     _, uname_t, amount_str, reason = parts
     if not amount_str.isdigit():
@@ -938,7 +905,7 @@ async def cmd_fine(msg: types.Message):
         pass
 
 @router.message(Command("bugfix"))
-async def cmd_bugfix(msg: types.Message):
+async def cmd_bugfix(msg: Message):
     uid = str(msg.chat.id)
     if not is_admin(uid):
         return
@@ -963,7 +930,7 @@ async def cmd_bugfix(msg: types.Message):
 # ================= ГОЛОВНИЙ ХЕНДЛЕР =================
 
 @router.message()
-async def handler(msg: types.Message):
+async def handler(msg: Message):
     uid   = str(msg.chat.id)
     text  = msg.text or ""
     uname = msg.from_user.username or ""
@@ -1008,24 +975,23 @@ async def handler(msg: types.Message):
     # ===== СТАНИ =====
 
     if user_states.get(uid) == "challenge_report":
-        # Учень звітує про виконання челенджу
         user_states.pop(uid, None)
         name = get_user_name(uid)
-        # Знаходимо його челендж
         challenge_text = ""
+        challenge_aid = ""
         for aid, data in pending_approvals.items():
             if data["uid"] == uid and data["action"] == "challenge":
                 challenge_text = data["text"]
+                challenge_aid = aid
                 break
+        approve_line = f"✅ /approve {challenge_aid}" if challenge_aid else "(заявка не знайдена)"
         await notify_admin(
             f"🎯 Звіт про челендж!\n\n"
             f"Учень: {name}\n"
             f"Завдання: {challenge_text}\n"
             f"Звіт: {text}\n\n"
-            f"Нарахувати +5 🪙?\n"
-            f"{'✅ /approve ' + [aid for aid, d in pending_approvals.items() if d['uid'] == uid and d['action'] == 'challenge'][0] if any(d['uid'] == uid and d['action'] == 'challenge' for d in pending_approvals.values()) else '(заявка не знайдена)'}"
+            f"Нарахувати +5 🪙?\n{approve_line}"
         )
-        # Публікуємо досягнення всьому класу
         users = get_all_users()
         achievement_text = (
             f"🏆 Досягнення!\n\n"
@@ -1043,7 +1009,8 @@ async def handler(msg: types.Message):
                 pass
         await msg.answer("✅ Звіт надіслано вчителю і опубліковано класу! Чекай на монети 🪙")
         return
-        # Мінімум 10 символів
+
+    if user_states.get(uid) == "idea":
         if len(text.strip()) < 10:
             await msg.answer("❌ Ідея занадто коротка! Напиши хоча б 10 символів 💡")
             user_states.pop(uid, None)
@@ -1083,11 +1050,11 @@ async def handler(msg: types.Message):
             f"✅ /approve {approval_id}\n❌ /reject {approval_id}"
         )
         for admin_id in ADMIN_IDS:
-                if admin_id:
-                    try:
-                        await msg.forward(admin_id)
-                    except Exception:
-                        pass
+            if admin_id:
+                try:
+                    await msg.forward(admin_id)
+                except Exception:
+                    pass
         await msg.answer("😂 Мем надіслано вчителю!\nПісля схвалення побачить весь клас і ти отримаєш +5 🪙 ⏳")
         return
 
@@ -1153,7 +1120,6 @@ async def handler(msg: types.Message):
         await msg.answer(f"✅ Надіслано таємному другу! +{actual} 🪙 💌")
         return
 
-    # Подарунок крок 1
     if user_states.get(uid) == "shop_gift_who":
         target_uid = find_user_by_username(text)
         if not target_uid:
@@ -1166,7 +1132,6 @@ async def handler(msg: types.Message):
         await msg.answer(f"Скільки монет подаруєш {get_user_name(target_uid)}?")
         return
 
-    # Подарунок крок 2
     if user_states.get(uid, "").startswith("shop_gift_amount:"):
         target_uid = user_states[uid].split(":")[1]
         if not text.isdigit():
@@ -1187,7 +1152,6 @@ async def handler(msg: types.Message):
             pass
         return
 
-    # Внесок у кошик
     if user_states.get(uid, "").startswith("basket_contribute:"):
         item_id = user_states[uid].split(":")[1]
         if not text.isdigit():
@@ -1234,7 +1198,6 @@ async def handler(msg: types.Message):
             )
         return
 
-    # Вчитель плюс/мінус
     if user_states.get(uid) in ("teacher_plus", "teacher_minus"):
         parts = text.strip().split()
         if len(parts) != 2 or not parts[1].isdigit():
@@ -1249,13 +1212,17 @@ async def handler(msg: types.Message):
         if user_states[uid] == "teacher_plus":
             add_coins(target_uid, amount)
             await msg.answer(f"✅ {target_name} +{amount} 🪙", reply_markup=teacher_kb)
-            try: await bot.send_message(int(target_uid), f"🎉 Вчитель нарахував тобі +{amount} 🪙!")
-            except Exception: pass
+            try:
+                await bot.send_message(int(target_uid), f"🎉 Вчитель нарахував тобі +{amount} 🪙!")
+            except Exception:
+                pass
         else:
             remove_coins_from(target_uid, amount)
             await msg.answer(f"✅ {target_name} -{amount} 🪙", reply_markup=teacher_kb)
-            try: await bot.send_message(int(target_uid), f"⚠️ Вчитель зняв {amount} 🪙")
-            except Exception: pass
+            try:
+                await bot.send_message(int(target_uid), f"⚠️ Вчитель зняв {amount} 🪙")
+            except Exception:
+                pass
         user_states.pop(uid, None)
         return
 
@@ -1268,8 +1235,10 @@ async def handler(msg: types.Message):
         user_states.pop(uid, None)
         await msg.answer(f"💸 З банку знято {amount} 🪙\nЗалишок: {get_class_bank()} 🪙", reply_markup=teacher_kb)
         for tuid in get_all_users():
-            try: await bot.send_message(int(tuid), f"⚠️ Вчитель зняв {amount} 🪙 з банку класу!")
-            except Exception: pass
+            try:
+                await bot.send_message(int(tuid), f"⚠️ Вчитель зняв {amount} 🪙 з банку класу!")
+            except Exception:
+                pass
         return
 
     # ===== ГОЛОВНЕ МЕНЮ =====
@@ -1322,7 +1291,6 @@ async def handler(msg: types.Message):
             user_states[uid] = "absence_text"
             await msg.answer("Напиши причину:")
             return
-        # Якщо написав щось інше — просимо обрати кнопку
         await msg.answer("Будь ласка, обери причину з кнопок 👆")
         return
 
@@ -1466,7 +1434,6 @@ async def handler(msg: types.Message):
         )
         return
 
-    # Обробка відповіді на emoji-загадку
     if uid in emoji_game:
         game = emoji_game[uid]
         riddle = game["riddle"]
@@ -1476,12 +1443,12 @@ async def handler(msg: types.Message):
             emoji_game.pop(uid, None)
             mark_daily(uid, "emoji_game")
             actual = add_daily_coins(uid, 5)
-            correct = riddle.get("answers", [riddle.get("answer", "")])[0].upper()
+            correct = answers[0].upper()
             await msg.answer(f"🎉 Правильно! {riddle['emoji']} = {correct}\n+{actual} 🪙")
         elif game["attempts"] >= 3:
             emoji_game.pop(uid, None)
             mark_daily(uid, "emoji_game")
-            correct = riddle.get("answers", [riddle.get("answer", "")])[0].upper()
+            correct = answers[0].upper()
             await msg.answer(f"😅 Не вгадав!\nПравильна відповідь: {correct} {riddle['emoji']}\nСпробуй завтра!")
         else:
             left = 3 - game["attempts"]
@@ -1489,7 +1456,6 @@ async def handler(msg: types.Message):
         return
 
     if text == "🤫 Таємний друг":
-        global secret_friend_pairs, secret_friend_cycle
         if not secret_friend_cycle:
             await msg.answer("🤫 Таємний друг ще не призначений.\nПари формуються автоматично кожні два тижні в понеділок!")
             return
@@ -1520,7 +1486,6 @@ async def handler(msg: types.Message):
                 await msg.answer("Введи @username того, кому хочеш подарувати монети:")
                 return
 
-            # Глобальний замок для місця в класі
             if item["id"] == SEAT_ITEM_ID:
                 wk = week_str()
                 if wk in seat_lock and seat_lock[wk] != uid:
@@ -1531,6 +1496,7 @@ async def handler(msg: types.Message):
                         f"Спробуй наступного тижня 😊"
                     )
                     return
+
             if item["price"] > 0 and check_weekly_purchase(uid, item["id"]):
                 await msg.answer(f"❌ {item['name']} вже купував цього тижня!\nПоверни наступного тижня 😊")
                 return
@@ -1543,7 +1509,6 @@ async def handler(msg: types.Message):
                 return
             remove_coins_from(uid, item["price"])
             mark_weekly_purchase(uid, item["id"])
-            # Записуємо глобальний замок для місця
             if item["id"] == SEAT_ITEM_ID:
                 seat_lock[week_str()] = uid
             if purchases_sheet:
@@ -1613,72 +1578,45 @@ async def handler(msg: types.Message):
 
     # ===== ВЧИТЕЛЬ =====
 
-    def teacher_kb():
-        return ReplyKeyboardMarkup(resize_keyboard=True).add(
-            KeyboardButton("➕ Плюс учню"),
-            KeyboardButton("➖ Мінус учню"),
-            KeyboardButton("💸 Штраф класу"),
-            KeyboardButton("🕊️ Амністія"),
-            KeyboardButton("📢 Оголошення"),
-            KeyboardButton("🔙 Назад")
-        )
-    
-    # основний хендлер для меню вчителя
     if text == "⚖️ Дія вчителя":
         if not is_admin(uid):
             await msg.answer("Тільки для вчителя 🙅")
             return
-        await msg.answer("Обери дію:", reply_markup=teacher_kb())
+        await msg.answer("Обери дію:", reply_markup=teacher_kb)
         return
-    
-    # плюс/мінус учню
+
     if text == "➕ Плюс учню" and is_admin(uid):
         user_states[uid] = "teacher_plus"
         await msg.answer("Формат: @username кількість")
         return
-    
+
     if text == "➖ Мінус учню" and is_admin(uid):
         user_states[uid] = "teacher_minus"
         await msg.answer("Формат: @username кількість")
         return
-    
-    # штраф класу
+
     if text == "💸 Штраф класу" and is_admin(uid):
         user_states[uid] = "teacher_fine"
         await msg.answer(f"Банк зараз: {get_class_bank()} 🪙\nСкільки зняти?")
         return
-    
-    # амністія
+
     if text == "🕊️ Амністія" and is_admin(uid):
         for tuid in get_all_users():
             try:
                 await bot.send_message(int(tuid), "🕊️ Вчитель оголосив амністію! 🎉")
             except Exception:
                 pass
-        await msg.answer("🕊️ Амністія оголошена!", reply_markup=teacher_kb())
+        await msg.answer("🕊️ Амністія оголошена!", reply_markup=teacher_kb)
         return
-    
-    # оголошення
+
     if text == "📢 Оголошення" and is_admin(uid):
         user_states[uid] = "announcement"
         await msg.answer("📢 Напиши текст оголошення — його отримають всі учні:")
         return
-    
-    # назад
+
     if text == "🔙 Назад":
         user_states.pop(uid, None)
         await msg.answer("Головне меню 👇", reply_markup=build_main_kb(uid))
-        return
-    
-    # обробка введеного тексту оголошення
-    if user_states.get(uid) == "announcement":
-        user_states.pop(uid, None)
-        for tuid in get_all_users():
-            try:
-                await bot.send_message(int(tuid), f"📢 Оголошення: {text}")
-            except Exception:
-                pass
-        await msg.answer("Оголошення розіслано ✅", reply_markup=teacher_kb())
         return
 
 # ================= АВТОЗАВДАННЯ =================
@@ -1692,8 +1630,9 @@ async def morning_digest():
             target += timedelta(days=1)
         await asyncio.sleep((target - now).total_seconds())
 
-        # Перевірка канікул — після пробудження о 7:45
         now = datetime.now(kyiv)
+
+        # Перевірка канікул
         on_vacation = False
         if vacations_sheet:
             try:
@@ -1710,7 +1649,6 @@ async def morning_digest():
             await asyncio.sleep(60)
             continue
 
-        now = datetime.now(kyiv)
         weekday = now.weekday()
 
         if weekday < 5:
@@ -1736,27 +1674,21 @@ async def morning_digest():
         users = get_all_users()
 
         # Іменинники
-async def send_birthday_to_class(bday_name: str):
-    users = get_all_users()
-    text = f"🎉 Сьогодні день народження у {bday_name}! Вітаємо від усього класу! 🥳"
-    for uid in users.keys():
-        try:
-            await bot.send_message(uid, text)
-        except Exception as e:
-            print(f"Не вдалося надіслати {uid}: {e}")
+        birthdays_today = []
+        if holidays_sheet:
+            try:
+                today_dm = now.strftime("%d.%m")
+                hrows = holidays_sheet.get_all_records()
+                for hr in hrows:
+                    bday_date = str(hr.get("Дата", "")).strip()
+                    if bday_date == today_dm:
+                        imya_key = "Ім'я"
+                        bday_name = f"{hr.get('Прізвище', '')} {hr.get(imya_key, '')}".strip()
+                        birthdays_today.append(bday_name)
+            except Exception:
+                pass
 
-async def morning_digest():
-    today = datetime.now(kyiv).strftime("%d.%m")
-    rows = holidays_sheet.get_all_records()
-    for row in rows:
-        bday_date = str(row.get("Дата", "")).strip()
-        if bday_date == today:
-            bday_fullname = f"{row.get('Прізвище', '')} {row.get('Ім’я', '')}".strip()
-            await send_birthday_to_class(bday_fullname)
-            break
-
-
-        # Золота монета — раз на місяць, зберігається в Банк
+        # Золота монета — раз на місяць
         current_month = now.strftime("%Y-%m")
         gold_msg = ""
         saved_gold_month = get_bank_value("gold_month", "")
@@ -1777,7 +1709,7 @@ async def morning_digest():
         if remaining_facts <= 10:
             await notify_admin(f"⚠️ Залишилось лише {remaining_facts} цікавих фактів!\nДодай нові в список FACTS 📝")
 
-        alarm_path = os.path.join(os.path.dirname(__file__), "alarm.mp3.mp3")
+        alarm_path = os.path.join(os.path.dirname(__file__), "alarm.mp3")
         alarm_exists = os.path.exists(alarm_path)
 
         for tuid in users:
@@ -1796,15 +1728,20 @@ async def morning_digest():
             for bday_name in birthdays_today:
                 bday_msg = f"🎂 Сьогодні день народження у {bday_name}!\nВесь клас вітає! 🎉🎈"
                 for tuid in users:
-                    try: await bot.send_message(int(tuid), bday_msg)
-                    except Exception: pass
+                    try:
+                        await bot.send_message(int(tuid), bday_msg)
+                    except Exception:
+                        pass
                 for tuid, info in users.items():
                     if info["name"].strip() == bday_name.strip():
                         add_coins(tuid, 10)
-                        try: await bot.send_message(int(tuid), "🎁 +10 🪙 у подарунок на день народження!")
-                        except Exception: pass
+                        try:
+                            await bot.send_message(int(tuid), "🎁 +10 🪙 у подарунок на день народження!")
+                        except Exception:
+                            pass
 
         await asyncio.sleep(60)
+
 
 async def reset_wake_daily():
     while True:
@@ -1815,6 +1752,7 @@ async def reset_wake_daily():
         await asyncio.sleep((target - now).total_seconds())
         wake_log.clear()
         daily_limits.clear()
+
 
 async def compliment_of_day():
     global compliment_log
@@ -1845,15 +1783,17 @@ async def compliment_of_day():
             try:
                 await bot.send_message(int(a), f"💌 Комплімент тижня!\n\nНапиши щось приємне для {get_user_name(b)} 😊")
                 user_states[a] = f"compliment_to:{b}"
-            except Exception: pass
+            except Exception:
+                pass
             try:
                 await bot.send_message(int(b), f"💌 Комплімент тижня!\n\nНапиши щось приємне для {get_user_name(a)} 😊")
                 user_states[b] = f"compliment_to:{a}"
-            except Exception: pass
+            except Exception:
+                pass
         await asyncio.sleep(60)
 
+
 async def secret_friend_task():
-    """Кожні два тижні (в понеділок парного тижня) формує 3 пари таємних друзів."""
     global secret_friend_pairs, secret_friend_cycle
     while True:
         now = datetime.now(kyiv)
@@ -1895,11 +1835,12 @@ async def secret_friend_task():
                     "Тобі призначено таємного друга на 2 тижні 💌\n"
                     "Натисни 🤫 Таємний друг щоб написати йому анонімно!"
                 )
-            except Exception: pass
+            except Exception:
+                pass
         await asyncio.sleep(60)
 
+
 async def daily_class_tax():
-    """Щодня о 23:00 знімає по 2 монети з кожного учня в банк класу."""
     while True:
         now = datetime.now(kyiv)
         target = now.replace(hour=23, minute=0, second=0, microsecond=0)
@@ -1947,7 +1888,6 @@ async def daily_class_tax():
 
 
 async def challenge_report_task():
-    """О 19:00 питає учнів що отримали челендж — чи виконали."""
     while True:
         now = datetime.now(kyiv)
         target = now.replace(hour=19, minute=0, second=0, microsecond=0)
@@ -1995,4 +1935,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
