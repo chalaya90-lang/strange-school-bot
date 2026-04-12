@@ -30,10 +30,11 @@ ADMIN_IDS = list(filter(None, [
     NOTIFY_ADMIN_ID,
     5687913918,   # Марія Чала
     2106101399,   # Лілія Шрам
+    1047959580,   # Oд
 ]))
 
 # Всі адміни отримують сповіщення
-ADMIN_IDS = [NOTIFY_ADMIN_ID, 5687913918, 2106101399]
+ADMIN_IDS = [NOTIFY_ADMIN_ID, 5687913918, 1047959580, 2106101399]
 
 # Максимум монет на день
 DAILY_COIN_LIMIT = 15
