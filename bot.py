@@ -1613,43 +1613,72 @@ async def handler(msg: types.Message):
 
     # ===== ВЧИТЕЛЬ =====
 
+    def teacher_kb():
+        return ReplyKeyboardMarkup(resize_keyboard=True).add(
+            KeyboardButton("➕ Плюс учню"),
+            KeyboardButton("➖ Мінус учню"),
+            KeyboardButton("💸 Штраф класу"),
+            KeyboardButton("🕊️ Амністія"),
+            KeyboardButton("📢 Оголошення"),
+            KeyboardButton("🔙 Назад")
+        )
+    
+    # основний хендлер для меню вчителя
     if text == "⚖️ Дія вчителя":
         if not is_admin(uid):
             await msg.answer("Тільки для вчителя 🙅")
             return
-        await msg.answer("Обери дію:", reply_markup=teacher_kb)
+        await msg.answer("Обери дію:", reply_markup=teacher_kb())
         return
-
+    
+    # плюс/мінус учню
     if text == "➕ Плюс учню" and is_admin(uid):
         user_states[uid] = "teacher_plus"
         await msg.answer("Формат: @username кількість")
         return
-
+    
     if text == "➖ Мінус учню" and is_admin(uid):
         user_states[uid] = "teacher_minus"
         await msg.answer("Формат: @username кількість")
         return
-
+    
+    # штраф класу
     if text == "💸 Штраф класу" and is_admin(uid):
         user_states[uid] = "teacher_fine"
         await msg.answer(f"Банк зараз: {get_class_bank()} 🪙\nСкільки зняти?")
         return
-
+    
+    # амністія
     if text == "🕊️ Амністія" and is_admin(uid):
         for tuid in get_all_users():
-            try: await bot.send_message(int(tuid), "🕊️ Вчитель оголосив амністію! 🎉")
-            except Exception: pass
-        await msg.answer("🕊️ Амністія оголошена!", reply_markup=teacher_kb)
+            try:
+                await bot.send_message(int(tuid), "🕊️ Вчитель оголосив амністію! 🎉")
+            except Exception:
+                pass
+        await msg.answer("🕊️ Амністія оголошена!", reply_markup=teacher_kb())
         return
-
+    
+    # оголошення
     if text == "📢 Оголошення" and is_admin(uid):
         user_states[uid] = "announcement"
         await msg.answer("📢 Напиши текст оголошення — його отримають всі учні:")
         return
-
+    
+    # назад
     if text == "🔙 Назад":
         user_states.pop(uid, None)
         await msg.answer("Головне меню 👇", reply_markup=build_main_kb(uid))
+        return
+    
+    # обробка введеного тексту оголошення
+    if user_states.get(uid) == "announcement":
+        user_states.pop(uid, None)
+        for tuid in get_all_users():
+            try:
+                await bot.send_message(int(tuid), f"📢 Оголошення: {text}")
+            except Exception:
+                pass
+        await msg.answer("Оголошення розіслано ✅", reply_markup=teacher_kb())
         return
 
 # ================= АВТОЗАВДАННЯ =================
@@ -1707,18 +1736,25 @@ async def morning_digest():
         users = get_all_users()
 
         # Іменинники
-        today_ddmm = now.strftime("%d.%m")
-        birthdays_today = []
-        if holidays_sheet:
-            try:
-                rows = holidays_sheet.get_all_records()
-                for r in rows:
-                    if str(r.get("Дата", "")).strip() == today_ddmm:
-                        surname   = str(r.get("Прізвище", "")).strip()
-                        firstname = str(r.get("Ім'я", "")).strip()
-                        birthdays_today.append(f"{surname} {firstname}")
-            except Exception:
-                pass
+async def send_birthday_to_class(bday_name: str):
+    users = get_all_users()
+    text = f"🎉 Сьогодні день народження у {bday_name}! Вітаємо від усього класу! 🥳"
+    for uid in users.keys():
+        try:
+            await bot.send_message(uid, text)
+        except Exception as e:
+            print(f"Не вдалося надіслати {uid}: {e}")
+
+async def morning_digest():
+    today = datetime.now(kyiv).strftime("%d.%m")
+    rows = holidays_sheet.get_all_records()
+    for row in rows:
+        bday_date = str(row.get("Дата", "")).strip()
+        if bday_date == today:
+            bday_fullname = f"{row.get('Прізвище', '')} {row.get('Ім’я', '')}".strip()
+            await send_birthday_to_class(bday_fullname)
+            break
+
 
         # Золота монета — раз на місяць, зберігається в Банк
         current_month = now.strftime("%Y-%m")
