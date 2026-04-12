@@ -652,7 +652,7 @@ async def cmd_approve(msg: Message):
             if tuid == data["uid"]:
                 continue
             try:
-                await bot.forward_message(int(tuid), NOTIFY_ADMIN_ID, data["msg_id"])
+                await bot.forward_message(int(tuid), int(data["uid"]), data["msg_id"])
             except Exception:
                 pass
         await msg.answer(f"✅ Мем схвалено і опубліковано всьому класу!\n{target_name} +{actual} 🪙")
@@ -974,6 +974,23 @@ async def handler(msg: Message):
 
     # ===== СТАНИ =====
 
+    # Якщо юзер у будь-якому стані натиснув кнопку меню — скасовуємо стан і йдемо далі
+    MENU_BUTTONS = {
+        "📅 Розклад", "🔔 Дзвінки", "📩 Повідомити про відсутність",
+        "💡 Ідеї для класу", "😂 Мем дня", "🎯 Челендж дня",
+        "💌 Написати добро", "🎰 Удача", "😴 Я прокинувся",
+        "🤫 Таємний друг", "🧩 Emoji-загадка", "🛒 Магазин",
+        "🧺 Спільні кошики", "🪙 Мої монетки", "🏦 Банк класу",
+        "🏆 Рейтинг", "📬 Скарга", "⚖️ Дія вчителя", "🔙 Назад",
+        "➕ Плюс учню", "➖ Мінус учню", "💸 Штраф класу",
+        "🕊️ Амністія", "📢 Оголошення",
+    }
+    current_state = user_states.get(uid, "")
+    if current_state and text in MENU_BUTTONS:
+        # Для станів де потрібна медіа (мем) — теж скасовуємо
+        user_states.pop(uid, None)
+        # Не робимо return — даємо коду нижче обробити кнопку
+
     if user_states.get(uid) == "challenge_report":
         user_states.pop(uid, None)
         name = get_user_name(uid)
@@ -1081,6 +1098,13 @@ async def handler(msg: Message):
     if user_states.get(uid) == "announcement":
         if not is_admin(uid):
             user_states.pop(uid, None)
+            return
+        if text == "🔙 Назад":
+            user_states.pop(uid, None)
+            await msg.answer("Головне меню 👇", reply_markup=build_main_kb(uid))
+            return
+        if len(text.strip()) < 3:
+            await msg.answer("❌ Оголошення занадто коротке!")
             return
         sender_name = get_user_name(uid)
         announcement_text = f"📢 Оголошення від {sender_name}:\n\n{text}"
