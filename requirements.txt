@@ -4,3 +4,4 @@ google-auth
 google-auth-oauthlib
 pytz
 google-auth-httplib2
+openai
