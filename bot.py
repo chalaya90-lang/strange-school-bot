@@ -8,8 +8,11 @@ import pytz
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove,
-    FSInputFile, Message
+    FSInputFile, Message, InlineKeyboardMarkup, InlineKeyboardButton,
+    CallbackQuery
 )
+from aiogram.filters import Command
+from aiogram import F
 from aiogram.filters import Command
 
 import gspread
@@ -484,8 +487,19 @@ def week_str() -> str:
 def has_russian(text: str) -> bool:
     return any(c in RUSSIAN_ONLY for c in text)
 
+ABSENCE_NOTIFY_IDS = [5687913918, 2106101399, 1047959580]  # Марія, Ліля, Од
+
 async def notify_admin(text: str):
-    for admin_id in ADMIN_IDS:
+    """Модерація (меми, ідеї, челенджі) — тільки Од"""
+    if NOTIFY_ADMIN_ID:
+        try:
+            await bot.send_message(NOTIFY_ADMIN_ID, text)
+        except Exception:
+            pass
+
+async def notify_absence(text: str):
+    """Відсутності — Марія, Ліля і Од"""
+    for admin_id in ABSENCE_NOTIFY_IDS:
         if admin_id:
             try:
                 await bot.send_message(admin_id, text)
@@ -599,7 +613,7 @@ async def cmd_info(msg: Message):
         "🎰 Удача — до +3 🪙 (2 рази на тиждень)\n"
         "🤫 Таємний друг — +2 🪙 за повідомлення\n"
         "💌 Комплімент тижня — +2 🪙\n"
-        "🎂 День народження — +10 🪙\n"
+        "🎂 День народження — +30 🪙\n"
         "🌟 Золота монета — +50 🪙 (раз на місяць)\n\n"
         "🛒 МАГАЗИН:\n"
         "🃏 Анонімний компліментик — 10 🪙\n"
@@ -699,6 +713,75 @@ async def cmd_reject(msg: Message):
         )
     except Exception:
         pass
+
+# ================= INLINE КНОПКИ МЕМІВ =================
+
+@router.callback_query(lambda c: c.data.startswith("meme_approve:"))
+async def meme_approve_callback(callback: CallbackQuery):
+    uid = str(callback.from_user.id)
+    if not is_admin(uid):
+        await callback.answer("Тільки для вчителя 🙅", show_alert=True)
+        return
+    approval_id = callback.data.split(":", 1)[1]
+    data = pending_approvals.pop(approval_id, None)
+    if not data:
+        await callback.answer("❌ Вже оброблено", show_alert=True)
+        return
+
+    actual = add_daily_coins(data["uid"], data["coins"])
+    target_name = get_user_name(data["uid"])
+
+    # Публікуємо всьому класу
+    users = get_all_users()
+    msg_obj = callback.message
+    for tuid in users:
+        if tuid == data["uid"]:
+            continue
+        try:
+            if msg_obj.photo:
+                await bot.send_photo(int(tuid), msg_obj.photo[-1].file_id, caption=f"😂 Мем від {target_name}")
+            elif msg_obj.animation:
+                await bot.send_animation(int(tuid), msg_obj.animation.file_id, caption=f"😂 Мем від {target_name}")
+            elif msg_obj.video:
+                await bot.send_video(int(tuid), msg_obj.video.file_id, caption=f"😂 Мем від {target_name}")
+        except Exception:
+            pass
+
+    # Повідомляємо учня
+    try:
+        await bot.send_message(
+            int(data["uid"]),
+            f"✅ Твій мем схвалено і побачив весь клас! 😂\n+{actual} 🪙 нараховано 🎉"
+        )
+    except Exception:
+        pass
+
+    # Оновлюємо повідомлення у вчителя
+    await callback.message.edit_caption(
+        caption=f"✅ Мем від {target_name} — опубліковано! +{actual} 🪙"
+    )
+    await callback.answer("✅ Опубліковано!")
+
+@router.callback_query(lambda c: c.data.startswith("meme_reject:"))
+async def meme_reject_callback(callback: CallbackQuery):
+    uid = str(callback.from_user.id)
+    if not is_admin(uid):
+        await callback.answer("Тільки для вчителя 🙅", show_alert=True)
+        return
+    approval_id = callback.data.split(":", 1)[1]
+    data = pending_approvals.pop(approval_id, None)
+    if not data:
+        await callback.answer("❌ Вже оброблено", show_alert=True)
+        return
+
+    target_name = get_user_name(data["uid"])
+    try:
+        await bot.send_message(int(data["uid"]), "❌ Вчитель не пропустив твій мем 😔")
+    except Exception:
+        pass
+
+    await callback.message.edit_caption(caption=f"❌ Мем від {target_name} — відхилено")
+    await callback.answer("❌ Відхилено")
 
 @router.message(Command("pending"))
 async def cmd_pending(msg: Message):
@@ -1062,14 +1145,23 @@ async def handler(msg: Message):
             "uid": uid, "action": "meme", "text": "мем",
             "coins": 5, "msg_id": msg.message_id
         }
-        await notify_admin(
-            f"😂 Мем від {get_user_name(uid)} — перевір вище ⬆️\n\n"
-            f"✅ /approve {approval_id}\n❌ /reject {approval_id}"
-        )
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Опублікувати", callback_data=f"meme_approve:{approval_id}"),
+            InlineKeyboardButton(text="❌ Відхилити",   callback_data=f"meme_reject:{approval_id}"),
+        ]])
+        caption = f"😂 Мем від {get_user_name(uid)}\nНатисни кнопку нижче:"
         for admin_id in ADMIN_IDS:
             if admin_id:
                 try:
-                    await msg.forward(admin_id)
+                    if msg.photo:
+                        await bot.send_photo(admin_id, msg.photo[-1].file_id, caption=caption, reply_markup=kb)
+                    elif msg.animation:
+                        await bot.send_animation(admin_id, msg.animation.file_id, caption=caption, reply_markup=kb)
+                    elif msg.video:
+                        await bot.send_video(admin_id, msg.video.file_id, caption=caption, reply_markup=kb)
+                    elif msg.sticker:
+                        await bot.send_sticker(admin_id, msg.sticker.file_id)
+                        await bot.send_message(admin_id, caption, reply_markup=kb)
                 except Exception:
                     pass
         await msg.answer("😂 Мем надіслано вчителю!\nПісля схвалення побачить весь клас і ти отримаєш +5 🪙 ⏳")
@@ -1308,7 +1400,7 @@ async def handler(msg: Message):
             if absence_sheet:
                 absence_sheet.append_row([now_str(), get_user_name(uid), text])
             user_states.pop(uid, None)
-            await notify_admin(f"📩 Відсутність!\n{get_user_name(uid)}\nПричина: {text}")
+            await notify_absence(f"📩 Відсутність!\n{get_user_name(uid)}\nПричина: {text}")
             await msg.answer("✅ Записано! Вчитель отримав сповіщення.", reply_markup=build_main_kb(uid))
             return
         if text == "📝 Інша причина":
@@ -1325,7 +1417,7 @@ async def handler(msg: Message):
         if absence_sheet:
             absence_sheet.append_row([now_str(), get_user_name(uid), text])
         user_states.pop(uid, None)
-        await notify_admin(f"📩 Відсутність!\n{get_user_name(uid)}\nПричина: {text}")
+        await notify_absence(f"📩 Відсутність!\n{get_user_name(uid)}\nПричина: {text}")
         await msg.answer("✅ Записано! Вчитель отримав сповіщення.", reply_markup=build_main_kb(uid))
         return
 
@@ -1758,9 +1850,9 @@ async def morning_digest():
                         pass
                 for tuid, info in users.items():
                     if info["name"].strip() == bday_name.strip():
-                        add_coins(tuid, 10)
+                        add_coins(tuid, 30)
                         try:
-                            await bot.send_message(int(tuid), "🎁 +10 🪙 у подарунок на день народження!")
+                            await bot.send_message(int(tuid), "🎁 +30 🪙 у подарунок на день народження! 🎂")
                         except Exception:
                             pass
 
