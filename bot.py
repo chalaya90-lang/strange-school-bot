@@ -25,10 +25,11 @@ TOKEN = os.getenv("BOT_TOKEN", "ВАШ_ТОКЕН_ТУТ")
 
 ADMIN_DISPLAY = {
     "Марія Чала":  "👩‍🏫 Марія Чала",
+    "Шрам Лілія":  "👩‍🏫 Лілія Шрам",
     "Лілія Шрам":  "👩‍🏫 Лілія Шрам",
     "Чала Любов":  "⚡️ Од",
 }
-ADMIN_NAMES = set(ADMIN_DISPLAY.keys())
+ADMIN_NAMES = {"Марія Чала", "Шрам Лілія", "Лілія Шрам", "Чала Любов"}
 NOTIFY_ADMIN_ID = int(os.getenv("NOTIFY_ADMIN_ID", "0"))
 
 ADMIN_IDS = list(filter(None, [
@@ -40,6 +41,16 @@ ADMIN_IDS = list(filter(None, [
 
 DAILY_COIN_LIMIT = 15
 SEAT_ITEM_ID = "seat"
+
+# Список дозволених прізвищ учнів (і вчителів)
+VALID_SURNAMES = {
+    "балабан", "борода", "волков", "волос", "гороховська",
+    "дяченко", "камнєва", "карпенко", "левкун", "литвин",
+    "манциленко", "мігаль", "момотова", "нагорна", "охріменко",
+    "савченко", "сидоркін", "страшенко", "тарадай", "цимбал",
+    "чала", "шинкар", "шкраба", "янушевська", "нагорний",
+    "шрам", "лілія", "марія", "любов",
+}
 
 # ================= EMOJI ЗАГАДКИ =================
 
@@ -1025,6 +1036,14 @@ async def handler(msg: Message):
         if len(words) < 2 or not all(w.isalpha() for w in words):
             await msg.answer("Введи прізвище та ім'я (тільки літери, два слова):")
             return
+        # Перевірка що прізвище є в списку учнів
+        surname = words[0].lower()
+        if surname not in VALID_SURNAMES:
+            await msg.answer(
+                "❌ Такого учня немає в класі!\n"
+                "Введи своє справжнє прізвище та ім'я:"
+            )
+            return
         register_user(uid, uname, name)
         user_states.pop(uid, None)
         display = ADMIN_DISPLAY.get(name, name)
@@ -1848,8 +1867,11 @@ async def morning_digest():
                         await bot.send_message(int(tuid), bday_msg)
                     except Exception:
                         pass
+                # Шукаємо іменинника — порівнюємо по частинах імені
+                bday_parts = set(bday_name.lower().split())
                 for tuid, info in users.items():
-                    if info["name"].strip() == bday_name.strip():
+                    user_parts = set(info["name"].lower().split())
+                    if bday_parts & user_parts == bday_parts or bday_parts == user_parts:
                         add_coins(tuid, 30)
                         try:
                             await bot.send_message(int(tuid), "🎁 +30 🪙 у подарунок на день народження! 🎂")
